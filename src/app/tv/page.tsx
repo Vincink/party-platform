@@ -14,8 +14,8 @@ export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
+  const [gameStarted, setGameStarted] = useState<boolean>(false)
   
-  // Empêche la double exécution en mode dev (React Strict Mode)
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -58,6 +58,21 @@ export default function TVPage() {
     }
   }, [])
 
+  // Fonction pour lancer la partie
+  async function startGame() {
+    const { error } = await supabase
+      .from('rooms')
+      .update({ status: 'playing' })
+      .eq('room_code', pin)
+
+    if (error) {
+      console.error('Erreur lancement:', error)
+      setDbError(error.message)
+    } else {
+      setGameStarted(true)
+    }
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-slate-950 text-white">
       <div className="max-w-2xl w-full text-center space-y-8">
@@ -79,12 +94,28 @@ export default function TVPage() {
           {playersList.length === 0 ? (
             <p className="text-slate-500 animate-pulse">En attente des joueurs sur leur smartphone...</p>
           ) : (
-            <div className="flex flex-wrap gap-3 justify-center">
+            <div className="flex flex-wrap gap-3 justify-center mb-6">
               {playersList.map((p) => (
                 <span key={p.id} className="px-4 py-2 bg-indigo-600/30 border border-indigo-500/50 rounded-xl font-semibold text-lg">
                   {p.pseudo}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Bouton pour lancer la partie (visible dès qu'un joueur rejoint) */}
+          {playersList.length > 0 && !gameStarted && (
+            <button
+              onClick={startGame}
+              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
+            >
+              🚀 Lancer la partie !
+            </button>
+          )}
+
+          {gameStarted && (
+            <div className="p-4 bg-emerald-500/20 border border-emerald-500 text-emerald-300 rounded-xl font-bold text-lg">
+              Partie lancée ! En attente de la suite...
             </div>
           )}
         </div>
