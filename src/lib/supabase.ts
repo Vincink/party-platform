@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://dvntgyohqrvbnfmblfug.supabase.co'
-const supabaseAnonKey = 'sb_publishable_OvtQDWR8wnWNBXI9HLKomw_H5zrEXBI'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Attention : Les clés Supabase ne sont pas configurées.')
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
