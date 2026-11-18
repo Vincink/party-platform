@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Player {
@@ -13,19 +13,30 @@ interface Player {
 export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [playersList, setPlayersList] = useState<Player[]>([])
+  const [dbError, setDbError] = useState<string>('')
+  
+  // Empêche la double exécution en mode dev (React Strict Mode)
+  const initialized = useRef(false)
 
   useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+
     const randomPin = Math.floor(1000 + Math.random() * 9000).toString()
     setPin(randomPin)
 
-    // Créer la room dans Supabase avec room_code
     async function createRoom() {
-      const { error } = await supabase.from('rooms').insert([{ room_code: randomPin, status: 'waiting' }])
-      if (error) console.error('Erreur création room:', error)
+      const { error } = await supabase
+        .from('rooms')
+        .insert([{ room_code: randomPin, status: 'waiting' }])
+      
+      if (error) {
+        console.error('Erreur création room:', error)
+        setDbError(error.message)
+      }
     }
     createRoom()
 
-    // Écouter les joueurs en temps réel via Supabase Realtime avec session_id
     const channel = supabase
       .channel('room-' + randomPin)
       .on(
@@ -52,6 +63,12 @@ export default function TVPage() {
       <div className="max-w-2xl w-full text-center space-y-8">
         <h1 className="text-3xl font-bold text-slate-300">Salon de l'Animateur</h1>
         
+        {dbError && (
+          <div className="p-4 bg-red-500/20 border border-red-500 text-red-300 rounded-xl text-sm font-semibold">
+            Erreur Supabase : {dbError}
+          </div>
+        )}
+
         <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
           <p className="text-sm uppercase tracking-widest text-slate-400 mb-2">Code de la partie</p>
           <div className="text-7xl font-black tracking-widest text-indigo-400">{pin || '----'}</div>
