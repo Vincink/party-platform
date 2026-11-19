@@ -15,6 +15,7 @@ export const viewport: Viewport = {
 }
 
 type ChoiceKey = 'A' | 'B' | 'C' | 'D'
+type GameType = 'quiz'
 
 interface PlayerRow {
   id: number
@@ -87,6 +88,7 @@ function PlayerContent() {
   const [selectedAnswer, setSelectedAnswer] = useState<ChoiceKey | null>(null)
   const [score, setScore] = useState<number>(0)
   const [rank, setRank] = useState<number>(1)
+  const [gameType, setGameType] = useState<GameType>('quiz')
   const [roomStatus, setRoomStatus] = useState<string>('waiting')
   const [lastOutcome, setLastOutcome] = useState<'correct' | 'wrong' | null>(null)
   const [errorMsg, setErrorMsg] = useState<string>('')
@@ -110,7 +112,6 @@ function PlayerContent() {
     }
   }, [initialPin, pin])
 
-  // Empêche le défilement et le pincement/zoom sur l'écran joueur
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -135,7 +136,6 @@ function PlayerContent() {
     }
   }, [])
 
-  // Maintien de l'écran allumé pendant la session joueur
   const requestScreenWakeLock = useCallback(async () => {
     if (typeof window === 'undefined' || typeof navigator === 'undefined') return
     if (document.visibilityState !== 'visible') return
@@ -193,19 +193,21 @@ function PlayerContent() {
     }
   }, [])
 
-  // Écoute des changements de statut du salon
   useEffect(() => {
     if (!joined || !pin) return
 
     async function syncInitialRoom() {
       const { data } = await supabase
         .from('rooms')
-        .select('status')
+        .select('status, game_type')
         .eq('room_code', pin)
         .maybeSingle()
 
       if (data?.status) {
         setRoomStatus(data.status)
+      }
+      if (data?.game_type === 'quiz') {
+        setGameType('quiz')
       }
       await refreshRank(pin, playerId)
     }
@@ -222,7 +224,12 @@ function PlayerContent() {
           filter: `room_code=eq.${pin}`,
         },
         (payload) => {
-          const nextStatus = String((payload.new as { status?: string })?.status || '')
+          const row = payload.new as { status?: string; game_type?: string }
+          if (row?.game_type === 'quiz') {
+            setGameType('quiz')
+          }
+
+          const nextStatus = String(row?.status || '')
           setRoomStatus(nextStatus)
 
           if (nextStatus.startsWith('playing')) {
@@ -252,7 +259,6 @@ function PlayerContent() {
     }
   }, [joined, pin, playerId, refreshRank])
 
-  // Écoute des mises à jour des scores dans la room (rang + état validation/erreur)
   useEffect(() => {
     if (!joined || !pin || !playerId) return
 
@@ -312,7 +318,7 @@ function PlayerContent() {
 
     const { data: room, error: roomErr } = await supabase
       .from('rooms')
-      .select('room_code, status')
+      .select('room_code, status, game_type')
       .eq('room_code', cleanPin)
       .maybeSingle()
 
@@ -347,6 +353,9 @@ function PlayerContent() {
       setScore(existingPlayer.score ?? 0)
       setSelectedAnswer((existingPlayer.answer as ChoiceKey | null) ?? null)
       setRoomStatus(room.status || 'waiting')
+      if (room.game_type === 'quiz') {
+        setGameType('quiz')
+      }
       setJoined(true)
       void refreshRank(cleanPin, existingPlayer.id)
       return
@@ -376,6 +385,9 @@ function PlayerContent() {
     setScore(inserted.score ?? 0)
     setSelectedAnswer(null)
     setRoomStatus(room.status || 'waiting')
+    if (room.game_type === 'quiz') {
+      setGameType('quiz')
+    }
     setJoined(true)
     void refreshRank(cleanPin, inserted.id)
   }
@@ -482,33 +494,35 @@ function PlayerContent() {
             </div>
           </div>
 
-          {/* 4 boutons de réponse juste en dessous de la pastille */}
-          <div className="grid grid-cols-2 gap-3">
-            {CHOICES.map((item) => {
-              const isSelected = selectedAnswer === item.key
-              const dimOther = Boolean(selectedAnswer) && !isSelected
+          {/* Zone des 4 boutons du Quiz */}
+          {gameType === 'quiz' && (
+            <div className="grid grid-cols-2 gap-3">
+              {CHOICES.map((item) => {
+                const isSelected = selectedAnswer === item.key
+                const dimOther = Boolean(selectedAnswer) && !isSelected
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  disabled={isLocked}
-                  onClick={() => void handleSelectAnswer(item.key)}
-                  className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all ${
-                    item.style
-                  } ${
-                    isSelected
-                      ? 'ring-4 ring-white scale-[0.98] brightness-110'
-                      : dimOther
-                      ? 'opacity-35 scale-[0.96]'
-                      : 'active:scale-95'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              )
-            })}
-          </div>
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => void handleSelectAnswer(item.key)}
+                    className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all ${
+                      item.style
+                    } ${
+                      isSelected
+                        ? 'ring-4 ring-white scale-[0.98] brightness-110'
+                        : dimOther
+                        ? 'opacity-35 scale-[0.96]'
+                        : 'active:scale-95'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {/* Message d'état discret en bas */}
           <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center">
