@@ -95,11 +95,17 @@ function PlayerContent() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
   const selectedAnswerRef = useRef<ChoiceKey | null>(null)
-  const lastPlayedRevealKeyRef = useRef<string>('')
+  const scoreRef = useRef<number>(0)
+  const roundCounterRef = useRef<number>(0)
+  const playedRoundSoundRef = useRef<number>(-1)
 
   useEffect(() => {
     selectedAnswerRef.current = selectedAnswer
   }, [selectedAnswer])
+
+  useEffect(() => {
+    scoreRef.current = score
+  }, [score])
 
   useEffect(() => {
     if (initialPin && !pin) {
@@ -178,7 +184,7 @@ function PlayerContent() {
     }
   }, [joined, requestScreenWakeLock])
 
-  const ensureAudioReady = useCallback(() => {
+  const ensureAudioReady = useCallback(async () => {
     if (typeof window === 'undefined') return null
     const AudioContextClass =
       window.AudioContext ||
@@ -189,47 +195,54 @@ function PlayerContent() {
       audioCtxRef.current = new AudioContextClass()
     }
     if (audioCtxRef.current.state === 'suspended') {
-      void audioCtxRef.current.resume()
+      try {
+        await audioCtxRef.current.resume()
+      } catch {
+        // Ignoré si le navigateur bloque la reprise
+      }
     }
     return audioCtxRef.current
   }, [])
 
   const playOutcomeSound = useCallback(
-    (isCorrect: boolean) => {
-      const ctx = ensureAudioReady()
+    async (isCorrect: boolean) => {
+      const ctx = await ensureAudioReady()
       if (!ctx) return
 
       const now = ctx.currentTime
 
       if (isCorrect) {
-        const notes = [587.33, 880]
+        const notes = [659.25, 987.77] // E5 -> B5 clair
         notes.forEach((freq, i) => {
           const osc = ctx.createOscillator()
           const gain = ctx.createGain()
-          const startAt = now + i * 0.11
+          const startAt = now + i * 0.12
           osc.type = 'triangle'
           osc.frequency.setValueAtTime(freq, startAt)
           gain.gain.setValueAtTime(0.001, startAt)
-          gain.gain.linearRampToValueAtTime(0.18, startAt + 0.02)
-          gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.24)
+          gain.gain.linearRampToValueAtTime(0.28, startAt + 0.02)
+          gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.25)
           osc.connect(gain)
           gain.connect(ctx.destination)
           osc.start(startAt)
-          osc.stop(startAt + 0.25)
+          osc.stop(startAt + 0.26)
         })
       } else {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.type = 'sawtooth'
-        osc.frequency.setValueAtTime(220, now)
-        osc.frequency.linearRampToValueAtTime(135, now + 0.28)
-        gain.gain.setValueAtTime(0.001, now)
-        gain.gain.linearRampToValueAtTime(0.14, now + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.start(now)
-        osc.stop(now + 0.31)
+        const tones = [311.13, 207.65] // D#4 -> G#3 audible sur mobile
+        tones.forEach((freq, i) => {
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          const startAt = now + i * 0.14
+          osc.type = 'sawtooth'
+          osc.frequency.setValueAtTime(freq, startAt)
+          gain.gain.setValueAtTime(0.001, startAt)
+          gain.gain.linearRampToValueAtTime(0.22, startAt + 0.02)
+          gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.22)
+          osc.connect(gain)
+          gain.connect(ctx.destination)
+          osc.start(startAt)
+          osc.stop(startAt + 0.23)
+        })
       }
     },
     [ensureAudioReady]
@@ -244,7 +257,6 @@ function PlayerContent() {
     }
   }, [])
 
-  // Synchronisation du rang à partir des scores de la room
   const refreshRank = useCallback(async (roomPin: string, currentPlayerId: number | null) => {
     if (!roomPin || !currentPlayerId) return
     const { data } = await supabase
@@ -289,28 +301,29 @@ function PlayerContent() {
           const nextStatus = String((payload.new as { status?: string })?.status || '')
           setRoomStatus(nextStatus)
 
-          if (nextStatus.startsWith('playing:')) {
+          if (nextStatus.startsWith('playing')) {
+            roundCounterRef.current += 1
             setSelectedAnswer(null)
             setLastOutcome(null)
           } else if (nextStatus === 'waiting') {
+            roundCounterRef.current = 0
+            playedRoundSoundRef.current = -1
             setSelectedAnswer(null)
             setLastOutcome(null)
             setScore(0)
             setRank(1)
-            lastPlayedRevealKeyRef.current = ''
           } else if (nextStatus.startsWith('revealed:')) {
             void refreshRank(pin, playerId)
             const parts = nextStatus.split(':')
-            const qIdx = parts[1] || '0'
             const correctLetter = (parts[2] || '') as ChoiceKey | ''
-            const revealKey = `${qIdx}:${correctLetter}`
             const chosen = selectedAnswerRef.current
+            const roundId = roundCounterRef.current
 
-            if (chosen && correctLetter && lastPlayedRevealKeyRef.current !== revealKey) {
-              lastPlayedRevealKeyRef.current = revealKey
+            if (chosen && correctLetter && playedRoundSoundRef.current !== roundId) {
+              playedRoundSoundRef.current = roundId
               const isCorrect = chosen === correctLetter
               setLastOutcome(isCorrect ? 'correct' : 'wrong')
-              playOutcomeSound(isCorrect)
+              void playOutcomeSound(isCorrect)
             }
           }
         }
@@ -322,7 +335,7 @@ function PlayerContent() {
     }
   }, [joined, pin, playerId, playOutcomeSound, refreshRank])
 
-  // Écoute des mises à jour des scores dans la room (pour le rang en direct)
+  // Écoute des mises à jour des scores dans la room (rang + son de validation/erreur)
   useEffect(() => {
     if (!joined || !pin || !playerId) return
 
@@ -340,7 +353,19 @@ function PlayerContent() {
           const row = payload.new as { id?: number; score?: number | null; answer?: string | null }
           if (row?.id === playerId) {
             if (typeof row.score === 'number') {
-              setScore(row.score)
+              const prevScore = scoreRef.current
+              const nextScore = row.score
+              const roundId = roundCounterRef.current
+              const hasAnswered = Boolean(selectedAnswerRef.current)
+
+              if (hasAnswered && playedRoundSoundRef.current !== roundId && nextScore !== prevScore) {
+                playedRoundSoundRef.current = roundId
+                const isCorrect = nextScore > prevScore
+                setLastOutcome(isCorrect ? 'correct' : 'wrong')
+                void playOutcomeSound(isCorrect)
+              }
+
+              setScore(nextScore)
             }
             if (row.answer === null) {
               setSelectedAnswer(null)
@@ -354,12 +379,12 @@ function PlayerContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [joined, pin, playerId, refreshRank])
+  }, [joined, pin, playerId, playOutcomeSound, refreshRank])
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg('')
-    ensureAudioReady()
+    void ensureAudioReady()
     void requestScreenWakeLock()
 
     const cleanPin = pin.trim()
@@ -448,7 +473,7 @@ function PlayerContent() {
 
   async function handleSelectAnswer(choice: ChoiceKey) {
     if (!playerId || selectedAnswer) return
-    ensureAudioReady()
+    void ensureAudioReady()
     void requestScreenWakeLock()
 
     setSelectedAnswer(choice)
@@ -463,7 +488,7 @@ function PlayerContent() {
     }
   }
 
-  const isRevealed = roomStatus.startsWith('revealed:')
+  const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
   const isLocked =
     Boolean(selectedAnswer) || isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'
 
