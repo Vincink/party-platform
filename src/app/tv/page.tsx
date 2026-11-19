@@ -72,6 +72,16 @@ const FLASHY_BORDERS = [
   { border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]', badge: 'text-emerald-300' },
 ]
 
+function getDisplayName(player: Player, allPlayers: Player[]) {
+  const sameNamePlayers = [...allPlayers]
+    .filter((p) => p.pseudo.trim().toLowerCase() === player.pseudo.trim().toLowerCase())
+    .sort((a, b) => a.id - b.id)
+
+  if (sameNamePlayers.length <= 1) return player.pseudo
+  const rank = sameNamePlayers.findIndex((p) => p.id === player.id) + 1
+  return rank === 1 ? player.pseudo : `${player.pseudo} (${rank})`
+}
+
 export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [playersList, setPlayersList] = useState<Player[]>([])
@@ -273,7 +283,7 @@ export default function TVPage() {
                         key={p.id}
                         className={`px-5 py-2.5 bg-slate-900 border-4 ${style.border} rounded-full font-bold text-xl`}
                       >
-                        {p.pseudo}
+                        {getDisplayName(p, playersList)}
                       </span>
                     )
                   })}
@@ -369,7 +379,7 @@ export default function TVPage() {
                           #{index + 1}
                         </span>
                         <span className="text-3xl md:text-4xl font-black truncate">
-                          {p.pseudo}
+                          {getDisplayName(p, playersList)}
                         </span>
                       </div>
 
