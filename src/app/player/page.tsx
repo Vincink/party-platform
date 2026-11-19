@@ -51,10 +51,11 @@ export default function PlayerPage() {
       .select()
       .single()
 
-    if (playerError || !player) {
-      setErrorMsg('Impossible de rejoindre le salon.')
+        if (playerError || !player) {
+      setErrorMsg(playerError?.message || 'Erreur inconnue')
       return
     }
+
 
     setPlayerId(player.id)
     setJoined(true)
