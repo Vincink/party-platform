@@ -11,7 +11,9 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  minimumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 }
 
 type ChoiceKey = 'A' | 'B' | 'C' | 'D'
@@ -98,6 +100,7 @@ function PlayerContent() {
   const lockedAnswerRef = useRef<ChoiceKey | null>(null)
   const submittingAnswerRef = useRef<boolean>(false)
   const scoreRef = useRef<number>(0)
+  const lastTapRef = useRef<number>(0)
 
   useEffect(() => {
     scoreRef.current = score
@@ -109,27 +112,68 @@ function PlayerContent() {
     }
   }, [initialPin, pin])
 
+  // Blocage strict du scroll, du pincement et du double-tap zoom sur iOS
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const preventPinchMove = (e: TouchEvent) => {
+    const htmlEl = document.documentElement
+    const bodyEl = document.body
+    const prevHtmlOverflow = htmlEl.style.overflow
+    const prevBodyOverflow = bodyEl.style.overflow
+    const prevHtmlOverscroll = htmlEl.style.overscrollBehavior
+    const prevBodyOverscroll = bodyEl.style.overscrollBehavior
+
+    htmlEl.style.overflow = 'hidden'
+    bodyEl.style.overflow = 'hidden'
+    htmlEl.style.overscrollBehavior = 'none'
+    bodyEl.style.overscrollBehavior = 'none'
+
+    const isFormField = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false
+      const tag = target.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length > 1) {
         e.preventDefault()
+        return
       }
+      if (!isFormField(e.target) && e.cancelable) {
+        e.preventDefault()
+      }
+    }
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (isFormField(e.target)) return
+      const now = Date.now()
+      if (now - lastTapRef.current < 300 && e.cancelable) {
+        e.preventDefault()
+      }
+      lastTapRef.current = now
     }
 
     const preventGesture = (e: Event) => {
       e.preventDefault()
     }
 
-    document.addEventListener('touchmove', preventPinchMove, { passive: false })
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+    document.addEventListener('touchend', handleTouchEnd, { passive: false })
     document.addEventListener('gesturestart', preventGesture, { passive: false })
     document.addEventListener('gesturechange', preventGesture, { passive: false })
+    document.addEventListener('gestureend', preventGesture, { passive: false })
 
     return () => {
-      document.removeEventListener('touchmove', preventPinchMove)
+      htmlEl.style.overflow = prevHtmlOverflow
+      bodyEl.style.overflow = prevBodyOverflow
+      htmlEl.style.overscrollBehavior = prevHtmlOverscroll
+      bodyEl.style.overscrollBehavior = prevBodyOverscroll
+
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
       document.removeEventListener('gesturestart', preventGesture)
       document.removeEventListener('gesturechange', preventGesture)
+      document.removeEventListener('gestureend', preventGesture)
     }
   }, [])
 
@@ -295,8 +339,13 @@ function PlayerContent() {
               }
               setScore(nextScore)
             }
-            // Si une réponse est déjà verrouillée localement, on ne l'écrase jamais
-            if (!lockedAnswerRef.current && (row.answer === 'A' || row.answer === 'B' || row.answer === 'C' || row.answer === 'D')) {
+            if (
+              !lockedAnswerRef.current &&
+              (row.answer === 'A' ||
+                row.answer === 'B' ||
+                row.answer === 'C' ||
+                row.answer === 'D')
+            ) {
               lockedAnswerRef.current = row.answer
               setSelectedAnswer(row.answer)
             }
@@ -441,7 +490,10 @@ function PlayerContent() {
   const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
 
   return (
-    <main className="h-dvh w-screen overflow-hidden overscroll-none select-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5">
+    <main
+      style={{ touchAction: 'none' }}
+      className="h-dvh w-screen fixed inset-0 overflow-hidden overscroll-none select-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5"
+    >
       {!joined ? (
         <form
           onSubmit={handleJoin}
@@ -472,6 +524,7 @@ function PlayerContent() {
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="1234"
+              style={{ touchAction: 'manipulation' }}
               className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-center text-3xl font-black tracking-widest"
             />
           </div>
@@ -486,6 +539,7 @@ function PlayerContent() {
               value={pseudo}
               onChange={(e) => setPseudo(e.target.value)}
               placeholder="Ex : Thomas"
+              style={{ touchAction: 'manipulation' }}
               className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold"
             />
           </div>
@@ -493,6 +547,7 @@ function PlayerContent() {
           <button
             type="submit"
             disabled={loading}
+            style={{ touchAction: 'manipulation' }}
             className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xl transition-colors touch-manipulation"
           >
             {loading ? 'Connexion...' : '🎮 Entrer dans le salon'}
@@ -535,6 +590,7 @@ function PlayerContent() {
                     type="button"
                     disabled={isLocked}
                     onClick={() => void handleSelectAnswer(item.key)}
+                    style={{ touchAction: 'manipulation' }}
                     className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all touch-manipulation ${
                       item.style
                     } ${
