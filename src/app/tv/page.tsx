@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { QUESTIONS } from '@/data/questions'
+import { QUESTIONS, type QuizQuestion } from '@/data/questions'
 
 interface Player {
   id: number
@@ -50,6 +50,15 @@ const FLASHY_BORDERS = [
   { border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]', badge: 'text-emerald-300' },
 ]
 
+function shuffleQuestions(list: QuizQuestion[]): QuizQuestion[] {
+  const copy = [...list]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
 function getDisplayName(player: Player, allPlayers: Player[]) {
   const sameNamePlayers = [...allPlayers]
     .filter((p) => p.pseudo.trim().toLowerCase() === player.pseudo.trim().toLowerCase())
@@ -87,6 +96,7 @@ export default function TVPage() {
   const [scoreLimit, setScoreLimit] = useState<number>(100)
   const [gameStarted, setGameStarted] = useState<boolean>(false)
   const [gameFinished, setGameFinished] = useState<boolean>(false)
+  const [deckQuestions, setDeckQuestions] = useState<QuizQuestion[]>(QUESTIONS)
   const [questionIndex, setQuestionIndex] = useState<number>(0)
   const [revealAnswers, setRevealAnswers] = useState<boolean>(false)
   const [scoredQuestionIndex, setScoredQuestionIndex] = useState<number | null>(null)
@@ -95,6 +105,7 @@ export default function TVPage() {
   const initialized = useRef(false)
   const pinRef = useRef<string>('')
   const playersListRef = useRef<Player[]>([])
+  const deckQuestionsRef = useRef<QuizQuestion[]>(QUESTIONS)
   const questionIndexRef = useRef<number>(0)
   const scoredQuestionIndexRef = useRef<number | null>(null)
   const isRevealingRef = useRef<boolean>(false)
@@ -102,6 +113,10 @@ export default function TVPage() {
   useEffect(() => {
     playersListRef.current = playersList
   }, [playersList])
+
+  useEffect(() => {
+    deckQuestionsRef.current = deckQuestions
+  }, [deckQuestions])
 
   useEffect(() => {
     questionIndexRef.current = questionIndex
@@ -116,7 +131,7 @@ export default function TVPage() {
     isRevealingRef.current = true
 
     const idx = questionIndexRef.current
-    const currentQuestion = QUESTIONS[idx]
+    const currentQuestion = deckQuestionsRef.current[idx]
     const currentPlayers = playersListRef.current
 
     if (scoredQuestionIndexRef.current !== idx && currentQuestion) {
@@ -256,6 +271,9 @@ export default function TVPage() {
       console.error('Erreur lancement:', error)
       setDbError(error.message)
     } else {
+      const shuffled = shuffleQuestions(QUESTIONS)
+      deckQuestionsRef.current = shuffled
+      setDeckQuestions(shuffled)
       setGameStarted(true)
       setGameFinished(false)
       setQuestionIndex(0)
@@ -277,7 +295,7 @@ export default function TVPage() {
       .eq('session_id', currentPin)
 
     setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
-    setQuestionIndex((prev) => (prev + 1) % QUESTIONS.length)
+    setQuestionIndex((prev) => (prev + 1) % deckQuestionsRef.current.length)
 
     await supabase
       .from('rooms')
@@ -298,6 +316,9 @@ export default function TVPage() {
       .update({ status: 'waiting' })
       .eq('room_code', currentPin)
 
+    const shuffled = shuffleQuestions(QUESTIONS)
+    deckQuestionsRef.current = shuffled
+    setDeckQuestions(shuffled)
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
     setGameFinished(false)
     setGameStarted(false)
@@ -308,7 +329,7 @@ export default function TVPage() {
     setTimeLeft(QUESTION_DURATION)
   }
 
-  const currentQuestion = QUESTIONS[questionIndex]
+  const currentQuestion = deckQuestions[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
 
   const playerColorMap = new Map<number, (typeof FLASHY_BORDERS)[number]>()
@@ -475,7 +496,7 @@ export default function TVPage() {
               <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
-                    Question {questionIndex + 1} / {QUESTIONS.length}
+                    Question {questionIndex + 1} / {deckQuestions.length}
                   </p>
 
                   <div
