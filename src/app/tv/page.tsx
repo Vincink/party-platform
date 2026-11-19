@@ -37,7 +37,7 @@ const GAME_OPTIONS: {
 const QUESTION_DURATION = 15
 const CORRECT_POINTS = 10
 const WRONG_ANSWER_PENALTY = 5
-const SCORE_LIMIT_OPTIONS = [100, 150, 200] as const
+const DEFAULT_SCORE_LIMIT = 100
 const TIMER_SOUND_SRC = '/quiz_son.mp3'
 
 const OPTION_STYLES: Record<string, string> = {
@@ -109,7 +109,7 @@ export default function TVPage() {
   const [selectedGame, setSelectedGame] = useState<GameType>('quiz')
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
-  const [scoreLimit, setScoreLimit] = useState<number>(100)
+  const [scoreLimit] = useState<number>(DEFAULT_SCORE_LIMIT)
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true)
   const [gameStarted, setGameStarted] = useState<boolean>(false)
   const [gameFinished, setGameFinished] = useState<boolean>(false)
@@ -253,8 +253,13 @@ export default function TVPage() {
         .insert([{ room_code: randomPin, status: 'waiting', game_type: 'quiz' }])
 
       if (error) {
-        console.error('Erreur création room:', error)
-        setDbError(error.message)
+        const fallback = await supabase
+          .from('rooms')
+          .insert([{ room_code: randomPin, status: 'waiting' }])
+        if (fallback.error) {
+          console.error('Erreur création room:', fallback.error)
+          setDbError(fallback.error.message)
+        }
       }
     }
     void createRoom()
@@ -329,40 +334,51 @@ export default function TVPage() {
     }
   }, [gameStarted, gameFinished, revealAnswers, questionIndex, triggerRevealAndScore, startTimerSound, stopTimerSound])
 
-  async function handleSelectGame(game: GameType) {
+  function handleSelectGame(game: GameType) {
     setSelectedGame(game)
     const currentPin = pin || pinRef.current
     if (!currentPin) return
 
-    await supabase
+    void supabase
       .from('rooms')
       .update({ game_type: game })
       .eq('room_code', currentPin)
+      .then(({ error }) => {
+        if (error && error.code !== '42703') {
+          console.error('Erreur sélection jeu:', error)
+        }
+      })
   }
 
   async function startGame() {
     const currentPin = pin || pinRef.current
     const { error } = await supabase
       .from('rooms')
-      .update({ status: 'playing:0', game_type: selectedGame })
+      .update({ status: 'playing:0' })
       .eq('room_code', currentPin)
 
     if (error) {
       console.error('Erreur lancement:', error)
       setDbError(error.message)
-    } else {
-      const shuffled = shuffleQuestions(QUESTIONS)
-      deckQuestionsRef.current = shuffled
-      setDeckQuestions(shuffled)
-      setGameStarted(true)
-      setGameFinished(false)
-      setQuestionIndex(0)
-      setRevealAnswers(false)
-      setScoredQuestionIndex(null)
-      scoredQuestionIndexRef.current = null
-      setTimeLeft(QUESTION_DURATION)
-      startTimerSound()
+      return
     }
+
+    void supabase
+      .from('rooms')
+      .update({ game_type: selectedGame })
+      .eq('room_code', currentPin)
+
+    const shuffled = shuffleQuestions(QUESTIONS)
+    deckQuestionsRef.current = shuffled
+    setDeckQuestions(shuffled)
+    setGameStarted(true)
+    setGameFinished(false)
+    setQuestionIndex(0)
+    setRevealAnswers(false)
+    setScoredQuestionIndex(null)
+    scoredQuestionIndexRef.current = null
+    setTimeLeft(QUESTION_DURATION)
+    startTimerSound()
   }
 
   async function nextQuestion() {
@@ -409,7 +425,7 @@ export default function TVPage() {
 
     await supabase
       .from('rooms')
-      .update({ status: 'waiting', game_type: selectedGame })
+      .update({ status: 'waiting' })
       .eq('room_code', currentPin)
 
     const shuffled = shuffleQuestions(QUESTIONS)
@@ -466,7 +482,7 @@ export default function TVPage() {
           </span>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-sm font-semibold text-slate-300">
-              +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts • Objectif : {scoreLimit} pts
+              +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts
             </span>
             <button
               type="button"
@@ -528,7 +544,7 @@ export default function TVPage() {
                     <button
                       key={game.id}
                       type="button"
-                      onClick={() => void handleSelectGame(game.id)}
+                      onClick={() => handleSelectGame(game.id)}
                       className={`px-6 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all cursor-pointer ${
                         active
                           ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
@@ -547,31 +563,6 @@ export default function TVPage() {
             </div>
 
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                  Limite de points pour gagner
-                </p>
-                <div className="flex justify-center gap-3">
-                  {SCORE_LIMIT_OPTIONS.map((limit) => {
-                    const active = scoreLimit === limit
-                    return (
-                      <button
-                        key={limit}
-                        type="button"
-                        onClick={() => setScoreLimit(limit)}
-                        className={`px-6 py-2.5 rounded-xl font-black text-xl border-2 transition-all cursor-pointer ${
-                          active
-                            ? 'bg-indigo-500 border-indigo-300 text-white shadow-[0_0_18px_rgba(99,102,241,0.5)]'
-                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
-                        }`}
-                      >
-                        {limit} pts
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
               <h2 className="text-xl font-bold text-indigo-300">
                 Joueurs connectés ({playersList.length})
               </h2>
