@@ -393,7 +393,25 @@ export default function TVPage() {
   const hasReachedLimit = playersList.some((p) => (p.score ?? 0) >= scoreLimit)
 
   return (
-    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white">
+    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-x-hidden">
+      <style>{`
+        @keyframes slideLeftFade {
+          0% {
+            opacity: 0;
+            transform: translateX(36px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .anim-slide-left {
+          animation-name: slideLeftFade;
+          animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+          animation-fill-mode: both;
+        }
+      `}</style>
+
       <div className="max-w-7xl w-full mx-auto space-y-6 flex-1 flex flex-col">
         {/* Barre supérieure */}
         <div className="flex items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl">
@@ -558,9 +576,13 @@ export default function TVPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1">
             <div className="lg:col-span-7 space-y-6">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center">
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center overflow-hidden">
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                  <p
+                    key={`label-${questionIndex}`}
+                    style={{ animationDuration: '350ms', animationDelay: '0ms' }}
+                    className="anim-slide-left text-xs uppercase tracking-widest text-indigo-400 font-bold"
+                  >
                     Question {questionIndex + 1} / {deckQuestions.length}
                   </p>
 
@@ -577,20 +599,26 @@ export default function TVPage() {
                   </div>
                 </div>
 
-                <h1 className="text-3xl md:text-4xl font-black leading-tight">
+                <h1
+                  key={`text-${questionIndex}`}
+                  style={{ animationDuration: '400ms', animationDelay: '320ms' }}
+                  className="anim-slide-left text-3xl md:text-4xl font-black leading-tight"
+                >
                   {currentQuestion.question}
                 </h1>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                {(['A', 'B', 'C', 'D'] as const).map((key) => {
+                {(['A', 'B', 'C', 'D'] as const).map((key, optIdx) => {
                   const isCorrect = revealAnswers && currentQuestion.correct === key
                   const isDimmed = revealAnswers && currentQuestion.correct !== key
+                  const optionDelay = 680 + optIdx * 65
 
                   return (
                     <div
-                      key={key}
-                      className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${
+                      key={`${questionIndex}-${key}`}
+                      style={{ animationDuration: '380ms', animationDelay: `${optionDelay}ms` }}
+                      className={`anim-slide-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${
                         OPTION_STYLES[key]
                       } ${
                         isCorrect
