@@ -39,6 +39,14 @@ export default function PlayerPage() {
 
   useEffect(() => {
     setClientId(getOrCreateClientId())
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const pinFromUrl = params.get('pin')
+      if (pinFromUrl) {
+        setRoomCode(pinFromUrl.replace(/\D/g, '').slice(0, 4))
+      }
+    }
   }, [])
 
   // Rejoindre ou reprendre la session de ce smartphone
@@ -83,7 +91,6 @@ export default function PlayerPage() {
     }
 
     if (existingDevicePlayer) {
-      // Si l'utilisateur a changé de pseudo sur le même téléphone, on met à jour son pseudo
       if (existingDevicePlayer.pseudo !== cleanPseudo) {
         await supabase
           .from('players')
@@ -102,7 +109,7 @@ export default function PlayerPage() {
       return
     }
 
-    // 2. Sinon, c'est un nouveau joueur (même si un autre smartphone a déjà pris ce prénom)
+    // 2. Sinon, création d'un nouveau joueur
     const { data: player, error: playerError } = await supabase
       .from('players')
       .insert([
