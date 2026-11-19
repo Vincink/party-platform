@@ -558,9 +558,9 @@ function PlayerContent() {
         </form>
       ) : (
         <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4">
-          {/* Pastille joueur positionnée sous la Dynamic Island avec la même couleur que sur la TV */}
+          {/* Pastille joueur positionnée sous la Dynamic Island avec la même couleur et le même halo que sur la TV */}
           <div
-            className={`bg-slate-900 border-2 ${pillStyle.pillBorder} ${pillStyle.pillGlow} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
+            className={`bg-slate-900 border-2 ${pillStyle.pillBorder} ${pillStyle.pillGlow} ${pillStyle.halo} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
           >
             <div className="flex items-center gap-3 min-w-0">
               <span
