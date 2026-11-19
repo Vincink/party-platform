@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { QUESTIONS, type QuizQuestion } from '@/data/questions'
-import { getPlayerColorStyle } from '@/lib/playerColors'
+import { getPlayerColorTheme, getPlayerNeonStyle } from '@/lib/playerColors'
 
 interface Player {
   id: number
@@ -491,7 +491,7 @@ export default function TVPage() {
   const hasReachedLimit = playersList.some((p) => (p.score ?? 0) >= scoreLimit)
 
   return (
-    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-x-hidden">
+    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-x-visible">
       <style>{`
         @keyframes slideLeftFade {
           0% {
@@ -520,7 +520,7 @@ export default function TVPage() {
           </span>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-sm font-semibold text-slate-300">
-              +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts
+              +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts • Objectif : {scoreLimit} pts
             </span>
             <button
               type="button"
@@ -609,18 +609,16 @@ export default function TVPage() {
                   En attente des joueurs sur leur smartphone...
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-4 justify-center">
-                  {playersList.map((p) => {
-                    const style = getPlayerColorStyle(p.id)
-                    return (
-                      <span
-                        key={p.id}
-                        className={`px-5 py-2.5 bg-slate-900 border-4 ${style.border} ${style.halo} rounded-full font-bold text-xl`}
-                      >
-                        {getDisplayName(p, playersList)}
-                      </span>
-                    )
-                  })}
+                <div className="flex flex-wrap gap-6 justify-center py-2">
+                  {playersList.map((p) => (
+                    <span
+                      key={p.id}
+                      style={getPlayerNeonStyle(p.id)}
+                      className="px-6 py-2.5 bg-slate-900/90 border-4 rounded-full font-bold text-xl"
+                    >
+                      {getDisplayName(p, playersList)}
+                    </span>
+                  ))}
                 </div>
               )}
 
@@ -644,16 +642,17 @@ export default function TVPage() {
               <h1 className="text-4xl md:text-5xl font-black">Classement final</h1>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               {rankedPlayers.map(({ player: p, rank }) => {
-                const colorStyle = getPlayerColorStyle(p.id)
+                const theme = getPlayerColorTheme(p.id)
                 return (
                   <div
                     key={p.id}
-                    className={`bg-slate-950 border-4 ${colorStyle.border} ${colorStyle.halo} rounded-3xl px-6 py-4 flex items-center justify-between gap-4`}
+                    style={getPlayerNeonStyle(p.id)}
+                    className="bg-slate-900/90 border-4 rounded-3xl px-6 py-4 flex items-center justify-between gap-4"
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <span className={`text-3xl font-black shrink-0 ${colorStyle.badge}`}>
+                      <span className={`text-3xl font-black shrink-0 ${theme.badgeClass}`}>
                         #{rank}
                       </span>
                       <span className="text-3xl md:text-4xl font-black truncate">
@@ -752,7 +751,7 @@ export default function TVPage() {
                               OPTION_STYLES[key]
                             } ${
                               isCorrect
-                                ? 'ring-4 ring-white scale-[1.05] brightness-125 shadow-[0_0_45px_rgba(255,255,255,0.65)] opacity-100 z-10'
+                                ? 'scale-[1.05] brightness-125 shadow-[0_0_45px_rgba(255,255,255,0.5)] opacity-100 z-10'
                                 : isDimmed
                                 ? 'opacity-25 scale-[0.96] grayscale'
                                 : ''
@@ -821,14 +820,14 @@ export default function TVPage() {
               </div>
             </div>
 
-            <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-5">
+            <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-5 overflow-visible">
               <h2 className="text-sm uppercase tracking-widest text-indigo-300 font-bold text-center">
                 Classement en direct
               </h2>
 
-              <div className="space-y-4">
+              <div className="space-y-6 py-2">
                 {rankedPlayers.map(({ player: p, rank }) => {
-                  const colorStyle = getPlayerColorStyle(p.id)
+                  const theme = getPlayerColorTheme(p.id)
                   const answerBubbleStyle =
                     p.answer && ANSWER_BUBBLE_STYLES[p.answer]
                       ? ANSWER_BUBBLE_STYLES[p.answer]
@@ -837,10 +836,11 @@ export default function TVPage() {
                   return (
                     <div
                       key={p.id}
-                      className={`bg-slate-900 border-4 ${colorStyle.border} ${colorStyle.halo} rounded-3xl px-6 py-4 flex items-center justify-between gap-4 transition-all`}
+                      style={getPlayerNeonStyle(p.id)}
+                      className="bg-slate-900/90 border-4 rounded-3xl px-6 py-4 flex items-center justify-between gap-4 transition-all"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className={`text-2xl font-black shrink-0 ${colorStyle.badge}`}>
+                        <span className={`text-2xl font-black shrink-0 ${theme.badgeClass}`}>
                           #{rank}
                         </span>
                         <span className="text-3xl md:text-4xl font-black truncate">
