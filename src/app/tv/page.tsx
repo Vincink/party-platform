@@ -398,11 +398,11 @@ export default function TVPage() {
         @keyframes slideLeftFade {
           0% {
             opacity: 0;
-            transform: translateX(36px);
+            translate: 36px 0;
           }
           100% {
             opacity: 1;
-            transform: translateX(0);
+            translate: 0 0;
           }
         }
         .anim-slide-left {
@@ -622,9 +622,9 @@ export default function TVPage() {
                         OPTION_STYLES[key]
                       } ${
                         isCorrect
-                          ? 'ring-4 ring-white scale-[1.04] brightness-110 shadow-[0_0_35px_rgba(255,255,255,0.45)] z-10'
+                          ? 'ring-4 ring-white scale-[1.05] brightness-125 shadow-[0_0_45px_rgba(255,255,255,0.65)] opacity-100 z-10'
                           : isDimmed
-                          ? 'opacity-30 scale-[0.98] grayscale-[30%]'
+                          ? 'opacity-25 scale-[0.96] grayscale'
                           : ''
                       }`}
                     >
