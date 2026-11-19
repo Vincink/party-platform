@@ -20,22 +20,22 @@ const CHOICES: { key: ChoiceKey; label: string; style: string }[] = [
   {
     key: 'A',
     label: 'A',
-    style: 'bg-rose-600 border-rose-300 text-white shadow-[0_0_24px_rgba(225,29,72,0.45)]',
+    style: 'bg-rose-600 border-rose-300 text-white shadow-[0_0_20px_rgba(225,29,72,0.4)]',
   },
   {
     key: 'B',
     label: 'B',
-    style: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_24px_rgba(37,99,235,0.45)]',
+    style: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]',
   },
   {
     key: 'C',
     label: 'C',
-    style: 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_24px_rgba(251,191,36,0.45)]',
+    style: 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_20px_rgba(251,191,36,0.4)]',
   },
   {
     key: 'D',
     label: 'D',
-    style: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_24px_rgba(5,150,105,0.45)]',
+    style: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_20px_rgba(5,150,105,0.4)]',
   },
 ]
 
@@ -176,8 +176,7 @@ function PlayerContent() {
       const now = ctx.currentTime
 
       if (isCorrect) {
-        // Double note claire et ascendante (validation)
-        const notes = [587.33, 880] // D5 -> A5
+        const notes = [587.33, 880]
         notes.forEach((freq, i) => {
           const osc = ctx.createOscillator()
           const gain = ctx.createGain()
@@ -193,7 +192,6 @@ function PlayerContent() {
           osc.stop(startAt + 0.25)
         })
       } else {
-        // Son grave descendant (erreur)
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
         osc.type = 'sawtooth'
@@ -220,7 +218,7 @@ function PlayerContent() {
     }
   }, [])
 
-  // Écoute des changements de statut du salon (révélation, question suivante, fin)
+  // Écoute des changements de statut du salon
   useEffect(() => {
     if (!joined || !pin) return
 
@@ -282,7 +280,7 @@ function PlayerContent() {
     }
   }, [joined, pin, playerId, playOutcomeSound])
 
-  // Écoute des mises à jour du joueur (score / réinitialisation réponse)
+  // Écoute des mises à jour du joueur
   useEffect(() => {
     if (!joined || !playerId) return
 
@@ -402,7 +400,7 @@ function PlayerContent() {
   }
 
   async function handleSelectAnswer(choice: ChoiceKey) {
-    if (!playerId) return
+    if (!playerId || selectedAnswer) return
     ensureAudioReady()
     void requestScreenWakeLock()
 
@@ -419,6 +417,7 @@ function PlayerContent() {
   }
 
   const isRevealed = roomStatus.startsWith('revealed:')
+  const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'
 
   return (
     <main className="h-dvh w-screen overflow-hidden overscroll-none select-none touch-none bg-slate-950 text-white flex flex-col justify-between p-5">
@@ -479,21 +478,9 @@ function PlayerContent() {
           </button>
         </form>
       ) : (
-        <>
-          {/* En-tête joueur */}
-          <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 px-4 py-3 rounded-2xl">
-            <div className="min-w-0">
-              <p className="text-xs text-slate-400 font-bold">PIN {pin}</p>
-              <p className="text-lg font-black truncate">{pseudo}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs text-slate-400 font-bold">Score</p>
-              <p className="text-2xl font-black text-indigo-300">{score} pts</p>
-            </div>
-          </div>
-
-          {/* Zone centrale : boutons A, B, C, D */}
-          <div className="flex-1 grid grid-cols-2 gap-4 my-4">
+        <div className="flex-1 flex flex-col justify-between max-w-lg w-full mx-auto pt-4 pb-1">
+          {/* Boutons A, B, C, D plus compacts */}
+          <div className="grid grid-cols-2 gap-3 pt-4">
             {CHOICES.map((item) => {
               const isSelected = selectedAnswer === item.key
               const dimOther = Boolean(selectedAnswer) && !isSelected
@@ -502,15 +489,15 @@ function PlayerContent() {
                 <button
                   key={item.key}
                   type="button"
-                  disabled={isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'}
+                  disabled={isLocked}
                   onClick={() => void handleSelectAnswer(item.key)}
-                  className={`rounded-3xl border-4 flex items-center justify-center text-6xl font-black transition-all ${
+                  className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all ${
                     item.style
                   } ${
                     isSelected
                       ? 'ring-4 ring-white scale-[0.98] brightness-110'
                       : dimOther
-                      ? 'opacity-40 scale-[0.96]'
+                      ? 'opacity-35 scale-[0.96]'
                       : 'active:scale-95'
                   }`}
                 >
@@ -520,42 +507,55 @@ function PlayerContent() {
             })}
           </div>
 
-          {/* Pied d'écran : statut */}
-          <div className="bg-slate-900/90 border border-slate-800 px-4 py-3 rounded-2xl text-center">
-            {roomStatus === 'waiting' && (
-              <p className="text-sm font-bold text-slate-300">
-                En attente du lancement sur la TV...
-              </p>
-            )}
-            {roomStatus === 'finished' && (
-              <p className="text-sm font-black text-amber-300">
-                Partie terminée — regarde le podium sur la TV !
-              </p>
-            )}
-            {isRevealed && lastOutcome === 'correct' && (
-              <p className="text-base font-black text-emerald-400">
-                Bonne réponse (+10 pts)
-              </p>
-            )}
-            {isRevealed && lastOutcome === 'wrong' && (
-              <p className="text-base font-black text-rose-400">
-                Mauvaise réponse (-5 pts)
-              </p>
-            )}
-            {isRevealed && !lastOutcome && (
-              <p className="text-sm font-bold text-slate-400">
-                Réponse révélée sur la TV
-              </p>
-            )}
-            {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
-              <p className="text-sm font-bold text-indigo-300">
-                {selectedAnswer
-                  ? `Choix ${selectedAnswer} enregistré — tu peux changer tant que le chrono tourne`
-                  : 'Choisis A, B, C ou D avant la fin du chrono'}
-              </p>
-            )}
+          {/* Zone basse descendue : statut + nom et score du joueur */}
+          <div className="mt-auto space-y-3 pt-6">
+            <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center">
+              {roomStatus === 'waiting' && (
+                <p className="text-sm font-bold text-slate-300">
+                  En attente du lancement sur la TV...
+                </p>
+              )}
+              {roomStatus === 'finished' && (
+                <p className="text-sm font-black text-amber-300">
+                  Partie terminée — regarde le podium sur la TV !
+                </p>
+              )}
+              {isRevealed && lastOutcome === 'correct' && (
+                <p className="text-base font-black text-emerald-400">
+                  Bonne réponse (+10 pts)
+                </p>
+              )}
+              {isRevealed && lastOutcome === 'wrong' && (
+                <p className="text-base font-black text-rose-400">
+                  Mauvaise réponse (-5 pts)
+                </p>
+              )}
+              {isRevealed && !lastOutcome && (
+                <p className="text-sm font-bold text-slate-400">
+                  Réponse révélée sur la TV
+                </p>
+              )}
+              {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
+                <p className="text-sm font-bold text-indigo-300">
+                  {selectedAnswer
+                    ? `Choix ${selectedAnswer} verrouillé`
+                    : 'Choisis A, B, C ou D avant la fin du chrono'}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-5 py-3.5 rounded-2xl shadow-lg">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-400 font-bold">PIN {pin}</p>
+                <p className="text-xl font-black truncate">{pseudo}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xs text-slate-400 font-bold">Score</p>
+                <p className="text-2xl font-black text-indigo-300">{score} pts</p>
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </main>
   )
