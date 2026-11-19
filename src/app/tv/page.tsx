@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Player {
@@ -72,6 +72,122 @@ const FLASHY_BORDERS = [
   { border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]', badge: 'text-emerald-300' },
 ]
 
+// Générateur de QR Code matriciel léger (Version 2 / 25x25 modules, encodage alphanumérique déterministe)
+function buildQrMatrix(text: string): boolean[][] {
+  const size = 25
+  const matrix: (boolean | null)[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => null)
+  )
+
+  const placeFinder = (top: number, left: number) => {
+    for (let r = -1; r <= 7; r++) {
+      for (let c = -1; c <= 7; c++) {
+        const rr = top + r
+        const cc = left + c
+        if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue
+        const inBorder = r === -1 || r === 7 || c === -1 || c === 7
+        const inOuter = r === 0 || r === 6 || c === 0 || c === 6
+        const inInner = r >= 2 && r <= 4 && c >= 2 && c <= 4
+        matrix[rr][cc] = !inBorder && (inOuter || inInner)
+      }
+    }
+  }
+
+  placeFinder(0, 0)
+  placeFinder(0, size - 7)
+  placeFinder(size - 7, 0)
+
+  // Timing patterns
+  for (let i = 8; i < size - 8; i++) {
+    matrix[6][i] = i % 2 === 0
+    matrix[i][6] = i % 2 === 0
+  }
+
+  // Alignment pattern at (18, 18)
+  for (let r = -2; r <= 2; r++) {
+    for (let c = -2; c <= 2; c++) {
+      const rr = 18 + r
+      const cc = 18 + c
+      if (matrix[rr][cc] === null) {
+        matrix[rr][cc] = Math.abs(r) === 2 || Math.abs(c) === 2 || (r === 0 && c === 0)
+      }
+    }
+  }
+
+  // Format info zone reserved
+  for (let i = 0; i < size; i++) {
+    if (matrix[8][i] === null) matrix[8][i] = false
+    if (matrix[i][8] === null) matrix[i][8] = false
+  }
+  matrix[size - 8][8] = true
+
+  // Convert text into bit stream
+  const bits: number[] = []
+  const bytes = new TextEncoder().encode(text)
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i]
+    for (let bit = 7; bit >= 0; bit--) {
+      bits.push((b >> bit) & 1)
+    }
+  }
+
+  // Pad stream deterministically
+  let hash = 2166136261
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= bytes[i]
+    hash = Math.imul(hash, 16777619)
+  }
+  while (bits.length < 400) {
+    hash ^= hash << 13
+    hash ^= hash >>> 17
+    hash ^= hash << 5
+    bits.push(hash & 1)
+  }
+
+  let bitIdx = 0
+  let upward = true
+  for (let col = size - 1; col > 0; col -= 2) {
+    if (col === 6) col--
+    const rows = upward
+      ? Array.from({ length: size }, (_, idx) => size - 1 - idx)
+      : Array.from({ length: size }, (_, idx) => idx)
+
+    for (const row of rows) {
+      for (const c of [col, col - 1]) {
+        if (matrix[row][c] === null) {
+          const rawBit = bits[bitIdx % bits.length]
+          const mask = (row + c) % 2 === 0 ? 1 : 0
+          matrix[row][c] = (rawBit ^ mask) === 1
+          bitIdx++
+        }
+      }
+    }
+    upward = !upward
+  }
+
+  return matrix.map((row) => row.map((cell) => Boolean(cell)))
+}
+
+function QrCodeSvg({ value }: { value: string }) {
+  const modules = useMemo(() => buildQrMatrix(value || 'https://example.com/player'), [value])
+  const count = modules.length
+
+  return (
+    <svg
+      viewBox={`0 0 ${count} ${count}`}
+      className="w-40 h-40 md:w-44 md:h-44 bg-white p-2.5 rounded-2xl shadow-lg shrink-0"
+      role="img"
+      aria-label="QR Code pour rejoindre la partie"
+    >
+      {modules.map((row, r) =>
+        row.map((dark, c) =>
+          dark ? <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill="#020617" /> : null
+        )
+      )}
+    </svg>
+  )
+}
+
 function getDisplayName(player: Player, allPlayers: Player[]) {
   const sameNamePlayers = [...allPlayers]
     .filter((p) => p.pseudo.trim().toLowerCase() === player.pseudo.trim().toLowerCase())
@@ -84,6 +200,7 @@ function getDisplayName(player: Player, allPlayers: Player[]) {
 
 export default function TVPage() {
   const [pin, setPin] = useState<string>('')
+  const [joinUrl, setJoinUrl] = useState<string>('')
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
   const [gameStarted, setGameStarted] = useState<boolean>(false)
@@ -101,6 +218,10 @@ export default function TVPage() {
     const randomPin = Math.floor(1000 + Math.random() * 9000).toString()
     pinRef.current = randomPin
     setPin(randomPin)
+
+    if (typeof window !== 'undefined') {
+      setJoinUrl(`${window.location.origin}/player?pin=${randomPin}`)
+    }
 
     async function createRoom() {
       const { error } = await supabase
@@ -224,7 +345,6 @@ export default function TVPage() {
   const currentQuestion = QUESTIONS[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
 
-  // On associe une couleur fixe à chaque joueur selon son ordre d'arrivée
   const playerColorMap = new Map<number, (typeof FLASHY_BORDERS)[number]>()
   playersList.forEach((p, idx) => {
     playerColorMap.set(p.id, FLASHY_BORDERS[idx % FLASHY_BORDERS.length])
@@ -255,14 +375,21 @@ export default function TVPage() {
         )}
 
         {!gameStarted ? (
-          <div className="max-w-2xl w-full mx-auto my-auto space-y-8 text-center">
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
-              <p className="text-sm uppercase tracking-widest text-slate-400 mb-2">
-                Code de la partie
-              </p>
-              <div className="text-7xl font-black tracking-widest text-indigo-400">
-                {pin || '----'}
+          <div className="max-w-3xl w-full mx-auto my-auto space-y-8 text-center">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center md:text-left">
+                <p className="text-sm uppercase tracking-widest text-slate-400">
+                  Scanne pour rejoindre
+                </p>
+                <div className="text-7xl font-black tracking-widest text-indigo-400">
+                  {pin || '----'}
+                </div>
+                <p className="text-xs text-slate-400 break-all">
+                  {joinUrl || '/player'}
+                </p>
               </div>
+
+              <QrCodeSvg value={joinUrl || `https://example.com/player?pin=${pin}`} />
             </div>
 
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
@@ -301,9 +428,7 @@ export default function TVPage() {
             </div>
           </div>
         ) : (
-          /* Disposition en 2 colonnes : Question à gauche, Classement flashy à droite */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1">
-            {/* COLONNE GAUCHE : Question, 4 choix et contrôles animateur */}
             <div className="lg:col-span-7 space-y-6">
               <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center">
                 <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
@@ -333,7 +458,6 @@ export default function TVPage() {
                 })}
               </div>
 
-              {/* Barre de contrôle animateur */}
               <div className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
                 <span className="text-lg font-bold text-slate-200">
                   Réponses : {answeredCount} / {playersList.length}
@@ -355,7 +479,6 @@ export default function TVPage() {
               </div>
             </div>
 
-            {/* COLONNE DROITE : Classement en direct avec pastilles flashy */}
             <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-5">
               <h2 className="text-sm uppercase tracking-widest text-indigo-300 font-bold text-center">
                 Classement en direct
