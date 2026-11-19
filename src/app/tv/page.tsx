@@ -250,16 +250,11 @@ export default function TVPage() {
     async function createRoom() {
       const { error } = await supabase
         .from('rooms')
-        .insert([{ room_code: randomPin, status: 'waiting', game_type: 'quiz' }])
+        .insert([{ room_code: randomPin, status: 'waiting' }])
 
       if (error) {
-        const fallback = await supabase
-          .from('rooms')
-          .insert([{ room_code: randomPin, status: 'waiting' }])
-        if (fallback.error) {
-          console.error('Erreur création room:', fallback.error)
-          setDbError(fallback.error.message)
-        }
+        console.error('Erreur création room:', error)
+        setDbError(error.message)
       }
     }
     void createRoom()
@@ -336,18 +331,6 @@ export default function TVPage() {
 
   function handleSelectGame(game: GameType) {
     setSelectedGame(game)
-    const currentPin = pin || pinRef.current
-    if (!currentPin) return
-
-    void supabase
-      .from('rooms')
-      .update({ game_type: game })
-      .eq('room_code', currentPin)
-      .then(({ error }) => {
-        if (error && error.code !== '42703') {
-          console.error('Erreur sélection jeu:', error)
-        }
-      })
   }
 
   async function startGame() {
@@ -362,11 +345,6 @@ export default function TVPage() {
       setDbError(error.message)
       return
     }
-
-    void supabase
-      .from('rooms')
-      .update({ game_type: selectedGame })
-      .eq('room_code', currentPin)
 
     const shuffled = shuffleQuestions(QUESTIONS)
     deckQuestionsRef.current = shuffled
