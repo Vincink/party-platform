@@ -487,7 +487,6 @@ function PlayerContent() {
     }
   }
 
-  const isGameStarted = roomStatus.startsWith('playing') || roomStatus.startsWith('revealed:')
   const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
   const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
   const pillStyle = getPlayerColorStyle(playerId ?? 0)
@@ -560,11 +559,11 @@ function PlayerContent() {
         <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4">
           {/* Pastille joueur positionnée sous la Dynamic Island avec la même couleur et le même halo que sur la TV */}
           <div
-            className={`bg-slate-900 border-2 ${pillStyle.pillBorder} ${pillStyle.pillGlow} ${pillStyle.halo} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
+            className={`bg-slate-900 border-4 ${pillStyle.pillBorder} ${pillStyle.pillGlow} ${pillStyle.halo} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
           >
             <div className="flex items-center gap-3 min-w-0">
               <span
-                className={`px-3 py-1 rounded-2xl border text-xl font-black shrink-0 ${pillStyle.rankBadge}`}
+                className={`px-3 py-1 rounded-2xl border-2 text-xl font-black shrink-0 ${pillStyle.rankBadge}`}
               >
                 #{rank}
               </span>
@@ -584,8 +583,8 @@ function PlayerContent() {
             </div>
           </div>
 
-          {/* Zone des 4 boutons du Quiz : visible uniquement une fois le jeu démarré */}
-          {gameType === 'quiz' && isGameStarted && (
+          {/* Zone des 4 boutons du Quiz */}
+          {gameType === 'quiz' && (
             <div className="grid grid-cols-2 gap-3">
               {CHOICES.map((item) => {
                 const isSelected = selectedAnswer === item.key
@@ -604,7 +603,7 @@ function PlayerContent() {
                       isLocked ? 'pointer-events-none cursor-default' : 'active:scale-95'
                     } ${
                       isSelected
-                        ? 'ring-4 ring-white scale-[0.98] brightness-110'
+                        ? 'scale-[0.98] brightness-110'
                         : dimOther
                         ? 'opacity-35 scale-[0.96]'
                         : ''
