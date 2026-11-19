@@ -224,14 +224,6 @@ export default function TVPage() {
     }
   }
 
-  async function toggleRevealAnswers() {
-    if (!revealAnswers) {
-      await triggerRevealAndScore()
-    } else {
-      setRevealAnswers(false)
-    }
-  }
-
   async function nextQuestion() {
     const currentPin = pin || pinRef.current
     setRevealAnswers(false)
@@ -381,7 +373,7 @@ export default function TVPage() {
                   return (
                     <div
                       key={key}
-                      className={`p-5 rounded-2xl border-2 flex items-center justify-between gap-3 transition-all duration-300 ${
+                      className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${
                         OPTION_STYLES[key]
                       } ${
                         isCorrect
@@ -391,20 +383,12 @@ export default function TVPage() {
                           : ''
                       }`}
                     >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
-                          {key}
-                        </span>
-                        <span className="text-2xl font-bold leading-snug">
-                          {currentQuestion.options[key]}
-                        </span>
-                      </div>
-
-                      {isCorrect && (
-                        <span className="px-3 py-1 rounded-full bg-white text-slate-950 font-black text-xs uppercase tracking-wider shrink-0 shadow">
-                          ✓ Bonne réponse
-                        </span>
-                      )}
+                      <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
+                        {key}
+                      </span>
+                      <span className="text-2xl font-bold leading-snug">
+                        {currentQuestion.options[key]}
+                      </span>
                     </div>
                   )
                 })}
@@ -414,20 +398,12 @@ export default function TVPage() {
                 <span className="text-lg font-bold text-slate-200">
                   Réponses : {answeredCount} / {playersList.length}
                 </span>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={toggleRevealAnswers}
-                    className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-lg rounded-xl transition-all cursor-pointer"
-                  >
-                    {revealAnswers ? 'Masquer la réponse' : 'Révéler (+10 pts)'}
-                  </button>
-                  <button
-                    onClick={nextQuestion}
-                    className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
-                  >
-                    Suivante →
-                  </button>
-                </div>
+                <button
+                  onClick={nextQuestion}
+                  className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
+                >
+                  Suivante →
+                </button>
               </div>
             </div>
 
