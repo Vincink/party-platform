@@ -16,6 +16,11 @@ export const viewport: Viewport = {
 
 type ChoiceKey = 'A' | 'B' | 'C' | 'D'
 
+interface PlayerRow {
+  id: number
+  score?: number | null
+}
+
 const CHOICES: { key: ChoiceKey; label: string; style: string }[] = [
   {
     key: 'A',
@@ -51,6 +56,26 @@ function getOrCreateClientId(): string {
   return existing
 }
 
+function computeDenseRankForPlayer(players: PlayerRow[], targetId: number | null): number {
+  if (!targetId || players.length === 0) return 1
+  const sorted = [...players].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+
+  let currentRank = 1
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0) {
+      const prevScore = sorted[i - 1].score ?? 0
+      const currScore = sorted[i].score ?? 0
+      if (currScore < prevScore) {
+        currentRank += 1
+      }
+    }
+    if (sorted[i].id === targetId) {
+      return currentRank
+    }
+  }
+  return 1
+}
+
 function PlayerContent() {
   const searchParams = useSearchParams()
   const initialPin = (searchParams.get('pin') || '').replace(/\D/g, '').slice(0, 4)
@@ -61,6 +86,7 @@ function PlayerContent() {
   const [playerId, setPlayerId] = useState<number | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<ChoiceKey | null>(null)
   const [score, setScore] = useState<number>(0)
+  const [rank, setRank] = useState<number>(1)
   const [roomStatus, setRoomStatus] = useState<string>('waiting')
   const [lastOutcome, setLastOutcome] = useState<'correct' | 'wrong' | null>(null)
   const [errorMsg, setErrorMsg] = useState<string>('')
@@ -218,6 +244,19 @@ function PlayerContent() {
     }
   }, [])
 
+  // Synchronisation du rang à partir des scores de la room
+  const refreshRank = useCallback(async (roomPin: string, currentPlayerId: number | null) => {
+    if (!roomPin || !currentPlayerId) return
+    const { data } = await supabase
+      .from('players')
+      .select('id, score')
+      .eq('session_id', roomPin)
+
+    if (data && data.length > 0) {
+      setRank(computeDenseRankForPlayer(data, currentPlayerId))
+    }
+  }, [])
+
   // Écoute des changements de statut du salon
   useEffect(() => {
     if (!joined || !pin) return
@@ -232,6 +271,7 @@ function PlayerContent() {
       if (data?.status) {
         setRoomStatus(data.status)
       }
+      await refreshRank(pin, playerId)
     }
     void syncInitialRoom()
 
@@ -256,8 +296,10 @@ function PlayerContent() {
             setSelectedAnswer(null)
             setLastOutcome(null)
             setScore(0)
+            setRank(1)
             lastPlayedRevealKeyRef.current = ''
           } else if (nextStatus.startsWith('revealed:')) {
+            void refreshRank(pin, playerId)
             const parts = nextStatus.split(':')
             const qIdx = parts[1] || '0'
             const correctLetter = (parts[2] || '') as ChoiceKey | ''
@@ -278,30 +320,33 @@ function PlayerContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [joined, pin, playerId, playOutcomeSound])
+  }, [joined, pin, playerId, playOutcomeSound, refreshRank])
 
-  // Écoute des mises à jour du joueur
+  // Écoute des mises à jour des scores dans la room (pour le rang en direct)
   useEffect(() => {
-    if (!joined || !playerId) return
+    if (!joined || !pin || !playerId) return
 
     const channel = supabase
-      .channel('player-self-' + playerId)
+      .channel('player-scores-' + pin + '-' + playerId)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'players',
-          filter: `id=eq.${playerId}`,
+          filter: `session_id=eq.${pin}`,
         },
         (payload) => {
-          const row = payload.new as { score?: number | null; answer?: string | null }
-          if (typeof row.score === 'number') {
-            setScore(row.score)
+          const row = payload.new as { id?: number; score?: number | null; answer?: string | null }
+          if (row?.id === playerId) {
+            if (typeof row.score === 'number') {
+              setScore(row.score)
+            }
+            if (row.answer === null) {
+              setSelectedAnswer(null)
+            }
           }
-          if (row.answer === null) {
-            setSelectedAnswer(null)
-          }
+          void refreshRank(pin, playerId)
         }
       )
       .subscribe()
@@ -309,7 +354,7 @@ function PlayerContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [joined, playerId])
+  }, [joined, pin, playerId, refreshRank])
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
@@ -369,6 +414,7 @@ function PlayerContent() {
       setSelectedAnswer((existingPlayer.answer as ChoiceKey | null) ?? null)
       setRoomStatus(room.status || 'waiting')
       setJoined(true)
+      void refreshRank(cleanPin, existingPlayer.id)
       return
     }
 
@@ -397,6 +443,7 @@ function PlayerContent() {
     setSelectedAnswer(null)
     setRoomStatus(room.status || 'waiting')
     setJoined(true)
+    void refreshRank(cleanPin, inserted.id)
   }
 
   async function handleSelectAnswer(choice: ChoiceKey) {
@@ -417,10 +464,11 @@ function PlayerContent() {
   }
 
   const isRevealed = roomStatus.startsWith('revealed:')
-  const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'
+  const isLocked =
+    Boolean(selectedAnswer) || isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'
 
   return (
-    <main className="h-dvh w-screen overflow-hidden overscroll-none select-none touch-none bg-slate-950 text-white flex flex-col justify-between p-5">
+    <main className="h-dvh w-screen overflow-hidden overscroll-none select-none touch-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5">
       {!joined ? (
         <form
           onSubmit={handleJoin}
@@ -478,9 +526,31 @@ function PlayerContent() {
           </button>
         </form>
       ) : (
-        <div className="flex-1 flex flex-col justify-between max-w-lg w-full mx-auto pt-4 pb-1">
-          {/* Boutons A, B, C, D plus compacts */}
-          <div className="grid grid-cols-2 gap-3 pt-4">
+        <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4">
+          {/* Pastille joueur positionnée sous la Dynamic Island */}
+          <div className="bg-slate-900 border-2 border-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.25)] px-4 py-3 rounded-3xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="px-3 py-1 rounded-2xl bg-cyan-400/15 border border-cyan-400/50 text-cyan-300 text-xl font-black shrink-0">
+                #{rank}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                  PIN {pin}
+                </p>
+                <p className="text-xl font-black truncate">{pseudo}</p>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                Score
+              </p>
+              <p className="text-2xl font-black text-white">{score} pts</p>
+            </div>
+          </div>
+
+          {/* 4 boutons de réponse juste en dessous de la pastille */}
+          <div className="grid grid-cols-2 gap-3">
             {CHOICES.map((item) => {
               const isSelected = selectedAnswer === item.key
               const dimOther = Boolean(selectedAnswer) && !isSelected
@@ -507,53 +577,40 @@ function PlayerContent() {
             })}
           </div>
 
-          {/* Zone basse descendue : statut + nom et score du joueur */}
-          <div className="mt-auto space-y-3 pt-6">
-            <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center">
-              {roomStatus === 'waiting' && (
-                <p className="text-sm font-bold text-slate-300">
-                  En attente du lancement sur la TV...
-                </p>
-              )}
-              {roomStatus === 'finished' && (
-                <p className="text-sm font-black text-amber-300">
-                  Partie terminée — regarde le podium sur la TV !
-                </p>
-              )}
-              {isRevealed && lastOutcome === 'correct' && (
-                <p className="text-base font-black text-emerald-400">
-                  Bonne réponse (+10 pts)
-                </p>
-              )}
-              {isRevealed && lastOutcome === 'wrong' && (
-                <p className="text-base font-black text-rose-400">
-                  Mauvaise réponse (-5 pts)
-                </p>
-              )}
-              {isRevealed && !lastOutcome && (
-                <p className="text-sm font-bold text-slate-400">
-                  Réponse révélée sur la TV
-                </p>
-              )}
-              {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
-                <p className="text-sm font-bold text-indigo-300">
-                  {selectedAnswer
-                    ? `Choix ${selectedAnswer} verrouillé`
-                    : 'Choisis A, B, C ou D avant la fin du chrono'}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-5 py-3.5 rounded-2xl shadow-lg">
-              <div className="min-w-0">
-                <p className="text-xs text-slate-400 font-bold">PIN {pin}</p>
-                <p className="text-xl font-black truncate">{pseudo}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-slate-400 font-bold">Score</p>
-                <p className="text-2xl font-black text-indigo-300">{score} pts</p>
-              </div>
-            </div>
+          {/* Message d'état discret en bas */}
+          <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center">
+            {roomStatus === 'waiting' && (
+              <p className="text-sm font-bold text-slate-300">
+                En attente du lancement sur la TV...
+              </p>
+            )}
+            {roomStatus === 'finished' && (
+              <p className="text-sm font-black text-amber-300">
+                Partie terminée — regarde le podium sur la TV !
+              </p>
+            )}
+            {isRevealed && lastOutcome === 'correct' && (
+              <p className="text-base font-black text-emerald-400">
+                Bonne réponse (+10 pts)
+              </p>
+            )}
+            {isRevealed && lastOutcome === 'wrong' && (
+              <p className="text-base font-black text-rose-400">
+                Mauvaise réponse (-5 pts)
+              </p>
+            )}
+            {isRevealed && !lastOutcome && (
+              <p className="text-sm font-bold text-slate-400">
+                Réponse révélée sur la TV
+              </p>
+            )}
+            {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
+              <p className="text-sm font-bold text-indigo-300">
+                {selectedAnswer
+                  ? `Choix ${selectedAnswer} verrouillé`
+                  : 'Choisis A, B, C ou D avant la fin du chrono'}
+              </p>
+            )}
           </div>
         </div>
       )}
