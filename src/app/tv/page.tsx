@@ -34,6 +34,7 @@ const GAME_OPTIONS: {
   },
 ]
 
+const START_COUNTDOWN_SECONDS = 3
 const QUESTION_DURATION = 15
 const CORRECT_POINTS = 10
 const WRONG_ANSWER_PENALTY = 5
@@ -111,7 +112,9 @@ export default function TVPage() {
   const [dbError, setDbError] = useState<string>('')
   const [scoreLimit] = useState<number>(DEFAULT_SCORE_LIMIT)
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true)
-  const [gameStarted, setGameStarted] = useState<boolean>(false)
+  const [gameOpened, setGameOpened] = useState<boolean>(false)
+  const [gameRunning, setGameRunning] = useState<boolean>(false)
+  const [startCountdown, setStartCountdown] = useState<number | null>(null)
   const [gameFinished, setGameFinished] = useState<boolean>(false)
   const [deckQuestions, setDeckQuestions] = useState<QuizQuestion[]>(QUESTIONS)
   const [questionIndex, setQuestionIndex] = useState<number>(0)
@@ -173,13 +176,16 @@ export default function TVPage() {
     }
   }, [])
 
+  const isQuestionActive =
+    gameOpened && gameRunning && startCountdown === null && !gameFinished && !revealAnswers
+
   useEffect(() => {
     if (!soundEnabled) {
       stopTimerSound()
-    } else if (gameStarted && !gameFinished && !revealAnswers) {
+    } else if (isQuestionActive) {
       startTimerSound()
     }
-  }, [soundEnabled, gameStarted, gameFinished, revealAnswers, stopTimerSound, startTimerSound])
+  }, [soundEnabled, isQuestionActive, stopTimerSound, startTimerSound])
 
   const triggerRevealAndScore = useCallback(async () => {
     if (isRevealingRef.current) return
@@ -304,8 +310,38 @@ export default function TVPage() {
     }
   }, [])
 
+  // Décompte de 3 secondes avant l'apparition de la première question
   useEffect(() => {
-    if (!gameStarted || gameFinished || revealAnswers) {
+    if (!gameRunning || startCountdown === null || gameFinished) return
+
+    const countdownTimer = window.setInterval(() => {
+      setStartCountdown((prev) => {
+        if (prev === null) return null
+        if (prev <= 1) {
+          window.clearInterval(countdownTimer)
+          const currentPin = pinRef.current
+          if (currentPin) {
+            void supabase
+              .from('rooms')
+              .update({ status: 'playing:0' })
+              .eq('room_code', currentPin)
+          }
+          setTimeLeft(QUESTION_DURATION)
+          startTimerSound()
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      window.clearInterval(countdownTimer)
+    }
+  }, [gameRunning, startCountdown, gameFinished, startTimerSound])
+
+  // Chrono de la question active
+  useEffect(() => {
+    if (!isQuestionActive) {
       stopTimerSound()
       return
     }
@@ -327,36 +363,71 @@ export default function TVPage() {
       window.clearInterval(timer)
       stopTimerSound()
     }
-  }, [gameStarted, gameFinished, revealAnswers, questionIndex, triggerRevealAndScore, startTimerSound, stopTimerSound])
+  }, [isQuestionActive, questionIndex, triggerRevealAndScore, startTimerSound, stopTimerSound])
 
   function handleSelectGame(game: GameType) {
     setSelectedGame(game)
   }
 
-  async function startGame() {
-    const currentPin = pin || pinRef.current
-    const { error } = await supabase
-      .from('rooms')
-      .update({ status: 'playing:0' })
-      .eq('room_code', currentPin)
-
-    if (error) {
-      console.error('Erreur lancement:', error)
-      setDbError(error.message)
-      return
-    }
-
+  function openGame() {
+    stopTimerSound()
     const shuffled = shuffleQuestions(QUESTIONS)
     deckQuestionsRef.current = shuffled
     setDeckQuestions(shuffled)
-    setGameStarted(true)
+    setGameOpened(true)
+    setGameRunning(false)
+    setStartCountdown(null)
     setGameFinished(false)
     setQuestionIndex(0)
     setRevealAnswers(false)
     setScoredQuestionIndex(null)
     scoredQuestionIndexRef.current = null
     setTimeLeft(QUESTION_DURATION)
-    startTimerSound()
+  }
+
+  async function startGame() {
+    stopTimerSound()
+    const currentPin = pin || pinRef.current
+    const shuffled = shuffleQuestions(QUESTIONS)
+    deckQuestionsRef.current = shuffled
+    setDeckQuestions(shuffled)
+    setQuestionIndex(0)
+    setRevealAnswers(false)
+    setScoredQuestionIndex(null)
+    scoredQuestionIndexRef.current = null
+    setTimeLeft(QUESTION_DURATION)
+    setGameFinished(false)
+    setGameRunning(true)
+    setStartCountdown(START_COUNTDOWN_SECONDS)
+
+    if (currentPin) {
+      await supabase
+        .from('players')
+        .update({ answer: null })
+        .eq('session_id', currentPin)
+      setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
+    }
+  }
+
+  async function stopGame() {
+    stopTimerSound()
+    setStartCountdown(null)
+    setGameRunning(false)
+    setRevealAnswers(false)
+    setTimeLeft(QUESTION_DURATION)
+
+    const currentPin = pin || pinRef.current
+    if (currentPin) {
+      await supabase
+        .from('players')
+        .update({ answer: null })
+        .eq('session_id', currentPin)
+      await supabase
+        .from('rooms')
+        .update({ status: 'waiting' })
+        .eq('room_code', currentPin)
+    }
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
   }
 
   async function nextQuestion() {
@@ -382,6 +453,8 @@ export default function TVPage() {
 
   async function finishGame() {
     stopTimerSound()
+    setStartCountdown(null)
+    setGameRunning(false)
     const currentPin = pin || pinRef.current
     setGameFinished(true)
     if (currentPin) {
@@ -411,7 +484,9 @@ export default function TVPage() {
     setDeckQuestions(shuffled)
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
     setGameFinished(false)
-    setGameStarted(false)
+    setGameOpened(false)
+    setGameRunning(false)
+    setStartCountdown(null)
     setQuestionIndex(0)
     setRevealAnswers(false)
     setScoredQuestionIndex(null)
@@ -419,6 +494,8 @@ export default function TVPage() {
     setTimeLeft(QUESTION_DURATION)
   }
 
+  const activeGameOption =
+    GAME_OPTIONS.find((g) => g.id === selectedGame) || GAME_OPTIONS[0]
   const currentQuestion = deckQuestions[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
 
@@ -482,7 +559,7 @@ export default function TVPage() {
           </div>
         )}
 
-        {!gameStarted ? (
+        {!gameOpened ? (
           <div className="max-w-4xl w-full mx-auto my-auto space-y-6 text-center">
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="space-y-2 text-center md:text-left">
@@ -567,10 +644,11 @@ export default function TVPage() {
 
               {playersList.length > 0 && (
                 <button
-                  onClick={startGame}
+                  type="button"
+                  onClick={openGame}
                   className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
                 >
-                  🚀 Lancer la partie !
+                  Ouvrir {activeGameOption.title}
                 </button>
               )}
             </div>
@@ -609,6 +687,7 @@ export default function TVPage() {
             </div>
 
             <button
+              type="button"
               onClick={replayGame}
               className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
             >
@@ -616,90 +695,147 @@ export default function TVPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1">
-            <div className="lg:col-span-7 space-y-6">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center overflow-hidden">
-                <div className="flex items-center justify-between gap-4">
-                  <p
-                    key={`label-${questionIndex}`}
-                    style={{ animationDuration: '350ms', animationDelay: '0ms' }}
-                    className="anim-slide-left text-xs uppercase tracking-widest text-indigo-400 font-bold"
-                  >
-                    Question {questionIndex + 1} / {deckQuestions.length}
-                  </p>
-
-                  <div
-                    className={`px-4 py-1.5 rounded-full font-black text-2xl tabular-nums border-2 transition-all ${
-                      revealAnswers
-                        ? 'bg-slate-800 border-slate-700 text-slate-400'
-                        : timeLeft <= 5
-                        ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.75)]'
-                        : 'bg-indigo-600/30 border-indigo-400 text-indigo-200'
-                    }`}
-                  >
-                    {revealAnswers ? 'Temps écoulé' : `${timeLeft}s`}
-                  </div>
-                </div>
-
-                <h1
-                  key={`text-${questionIndex}`}
-                  style={{ animationDuration: '400ms', animationDelay: '320ms' }}
-                  className="anim-slide-left text-3xl md:text-4xl font-black leading-tight"
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 relative">
+            {/* Décompte géant de 3 secondes au milieu de l'écran */}
+            {startCountdown !== null && (
+              <div className="fixed inset-0 z-50 bg-slate-950/90 flex flex-col items-center justify-center pointer-events-none select-none">
+                <span
+                  key={`countdown-${startCountdown}`}
+                  style={{ animationDuration: '350ms', animationDelay: '0ms' }}
+                  className="anim-slide-left text-[11rem] md:text-[15rem] leading-none font-black text-indigo-400 drop-shadow-[0_0_50px_rgba(129,140,248,0.75)] tabular-nums"
                 >
-                  {currentQuestion.question}
-                </h1>
+                  {startCountdown}
+                </span>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                {(['A', 'B', 'C', 'D'] as const).map((key, optIdx) => {
-                  const isCorrect = revealAnswers && currentQuestion.correct === key
-                  const isDimmed = revealAnswers && currentQuestion.correct !== key
-                  const optionDelay = 680 + optIdx * 65
+            <div className="lg:col-span-7 space-y-6">
+              {!gameRunning ? (
+                <div className="bg-slate-900 border border-slate-800 p-10 rounded-3xl shadow-2xl text-center space-y-4">
+                  <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                    {activeGameOption.title} ouvert — prêt à démarrer
+                  </p>
+                  <h1 className="text-3xl md:text-4xl font-black">
+                    {playersList.length} joueur{playersList.length > 1 ? 's' : ''} dans le salon
+                  </h1>
+                  <p className="text-slate-400 text-base">
+                    Clique sur « Démarrer le jeu » pour lancer le décompte de 3 secondes.
+                  </p>
+                </div>
+              ) : (
+                startCountdown === null && (
+                  <>
+                    <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center overflow-hidden">
+                      <div className="flex items-center justify-between gap-4">
+                        <p
+                          key={`label-${questionIndex}`}
+                          style={{ animationDuration: '350ms', animationDelay: '0ms' }}
+                          className="anim-slide-left text-xs uppercase tracking-widest text-indigo-400 font-bold"
+                        >
+                          Question {questionIndex + 1} / {deckQuestions.length}
+                        </p>
 
-                  return (
-                    <div
-                      key={`${questionIndex}-${key}`}
-                      style={{ animationDuration: '380ms', animationDelay: `${optionDelay}ms` }}
-                      className={`anim-slide-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${
-                        OPTION_STYLES[key]
-                      } ${
-                        isCorrect
-                          ? 'ring-4 ring-white scale-[1.05] brightness-125 shadow-[0_0_45px_rgba(255,255,255,0.65)] opacity-100 z-10'
-                          : isDimmed
-                          ? 'opacity-25 scale-[0.96] grayscale'
-                          : ''
-                      }`}
-                    >
-                      <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
-                        {key}
-                      </span>
-                      <span className="text-2xl font-bold leading-snug">
-                        {currentQuestion.options[key]}
-                      </span>
+                        <div
+                          className={`px-4 py-1.5 rounded-full font-black text-2xl tabular-nums border-2 transition-all ${
+                            revealAnswers
+                              ? 'bg-slate-800 border-slate-700 text-slate-400'
+                              : timeLeft <= 5
+                              ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.75)]'
+                              : 'bg-indigo-600/30 border-indigo-400 text-indigo-200'
+                          }`}
+                        >
+                          {revealAnswers ? 'Temps écoulé' : `${timeLeft}s`}
+                        </div>
+                      </div>
+
+                      <h1
+                        key={`text-${questionIndex}`}
+                        style={{ animationDuration: '400ms', animationDelay: '320ms' }}
+                        className="anim-slide-left text-3xl md:text-4xl font-black leading-tight"
+                      >
+                        {currentQuestion.question}
+                      </h1>
                     </div>
-                  )
-                })}
-              </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                      {(['A', 'B', 'C', 'D'] as const).map((key, optIdx) => {
+                        const isCorrect = revealAnswers && currentQuestion.correct === key
+                        const isDimmed = revealAnswers && currentQuestion.correct !== key
+                        const optionDelay = 680 + optIdx * 65
+
+                        return (
+                          <div
+                            key={`${questionIndex}-${key}`}
+                            style={{ animationDuration: '380ms', animationDelay: `${optionDelay}ms` }}
+                            className={`anim-slide-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${
+                              OPTION_STYLES[key]
+                            } ${
+                              isCorrect
+                                ? 'ring-4 ring-white scale-[1.05] brightness-125 shadow-[0_0_45px_rgba(255,255,255,0.65)] opacity-100 z-10'
+                                : isDimmed
+                                ? 'opacity-25 scale-[0.96] grayscale'
+                                : ''
+                            }`}
+                          >
+                            <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
+                              {key}
+                            </span>
+                            <span className="text-2xl font-bold leading-snug">
+                              {currentQuestion.options[key]}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )
+              )}
 
               <div className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
-                <span className="text-lg font-bold text-slate-200">
-                  Réponses : {answeredCount} / {playersList.length}
-                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  {!gameRunning ? (
+                    <button
+                      type="button"
+                      onClick={() => void startGame()}
+                      className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                    >
+                      Démarrer le jeu
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void stopGame()}
+                      className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                    >
+                      Arrêter
+                    </button>
+                  )}
 
-                {revealAnswers && hasReachedLimit ? (
-                  <button
-                    onClick={finishGame}
-                    className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
-                  >
-                    🏆 Voir le podium final
-                  </button>
-                ) : (
-                  <button
-                    onClick={nextQuestion}
-                    className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
-                  >
-                    Suivante →
-                  </button>
+                  {gameRunning && startCountdown === null && (
+                    <span className="text-lg font-bold text-slate-200">
+                      Réponses : {answeredCount} / {playersList.length}
+                    </span>
+                  )}
+                </div>
+
+                {gameRunning && startCountdown === null && (
+                  revealAnswers && hasReachedLimit ? (
+                    <button
+                      type="button"
+                      onClick={() => void finishGame()}
+                      className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                    >
+                      🏆 Voir le podium final
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void nextQuestion()}
+                      className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
+                    >
+                      Suivante →
+                    </button>
+                  )
                 )}
               </div>
             </div>
