@@ -18,6 +18,22 @@ interface RankedPlayer {
   rank: number
 }
 
+type GameType = 'quiz'
+
+const GAME_OPTIONS: {
+  id: GameType
+  title: string
+  subtitle: string
+  icon: string
+}[] = [
+  {
+    id: 'quiz',
+    title: 'Quiz',
+    subtitle: '4 choix • +10 / -5 pts',
+    icon: '🧠',
+  },
+]
+
 const QUESTION_DURATION = 15
 const CORRECT_POINTS = 10
 const WRONG_ANSWER_PENALTY = 5
@@ -31,7 +47,6 @@ const OPTION_STYLES: Record<string, string> = {
   D: 'bg-emerald-600/90 border-emerald-400',
 }
 
-// Bulles colorées associées à chaque lettre de choix
 const ANSWER_BUBBLE_STYLES: Record<string, string> = {
   A: 'bg-rose-600 border-rose-300 text-white shadow-[0_0_14px_rgba(225,29,72,0.7)]',
   B: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_14px_rgba(37,99,235,0.7)]',
@@ -39,7 +54,6 @@ const ANSWER_BUBBLE_STYLES: Record<string, string> = {
   D: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_14px_rgba(5,150,105,0.7)]',
 }
 
-// Couleurs flashy distinctes pour les bordures des pastilles joueurs
 const FLASHY_BORDERS = [
   { border: 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.45)]', badge: 'text-cyan-300' },
   { border: 'border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.45)]', badge: 'text-fuchsia-300' },
@@ -92,6 +106,7 @@ function computeDenseRanks(players: Player[]): RankedPlayer[] {
 export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [joinUrl, setJoinUrl] = useState<string>('')
+  const [selectedGame, setSelectedGame] = useState<GameType>('quiz')
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
   const [scoreLimit, setScoreLimit] = useState<number>(100)
@@ -146,9 +161,7 @@ export default function TVPage() {
     }
     const audio = audioRef.current
     audio.currentTime = 0
-    void audio.play().catch(() => {
-      // Lecture bloquée tant qu'aucune interaction utilisateur n'a eu lieu
-    })
+    void audio.play().catch(() => {})
   }, [soundEnabled])
 
   useEffect(() => {
@@ -173,6 +186,7 @@ export default function TVPage() {
     isRevealingRef.current = true
     stopTimerSound()
 
+    const currentPin = pinRef.current
     const idx = questionIndexRef.current
     const currentQuestion = deckQuestionsRef.current[idx]
     const currentPlayers = playersListRef.current
@@ -210,6 +224,13 @@ export default function TVPage() {
       setPlayersList(updatedList)
     }
 
+    if (currentPin) {
+      await supabase
+        .from('rooms')
+        .update({ status: `revealed:${idx}:${currentQuestion?.correct ?? ''}` })
+        .eq('room_code', currentPin)
+    }
+
     setRevealAnswers(true)
     isRevealingRef.current = false
   }, [stopTimerSound])
@@ -229,14 +250,14 @@ export default function TVPage() {
     async function createRoom() {
       const { error } = await supabase
         .from('rooms')
-        .insert([{ room_code: randomPin, status: 'waiting' }])
+        .insert([{ room_code: randomPin, status: 'waiting', game_type: 'quiz' }])
 
       if (error) {
         console.error('Erreur création room:', error)
         setDbError(error.message)
       }
     }
-    createRoom()
+    void createRoom()
 
     const channel = supabase
       .channel('room-tv-' + randomPin)
@@ -283,7 +304,6 @@ export default function TVPage() {
     }
   }, [])
 
-  // Compte à rebours de 15 secondes
   useEffect(() => {
     if (!gameStarted || gameFinished || revealAnswers) {
       stopTimerSound()
@@ -309,11 +329,22 @@ export default function TVPage() {
     }
   }, [gameStarted, gameFinished, revealAnswers, questionIndex, triggerRevealAndScore, startTimerSound, stopTimerSound])
 
+  async function handleSelectGame(game: GameType) {
+    setSelectedGame(game)
+    const currentPin = pin || pinRef.current
+    if (!currentPin) return
+
+    await supabase
+      .from('rooms')
+      .update({ game_type: game })
+      .eq('room_code', currentPin)
+  }
+
   async function startGame() {
     const currentPin = pin || pinRef.current
     const { error } = await supabase
       .from('rooms')
-      .update({ status: 'playing' })
+      .update({ status: 'playing:0', game_type: selectedGame })
       .eq('room_code', currentPin)
 
     if (error) {
@@ -337,6 +368,7 @@ export default function TVPage() {
   async function nextQuestion() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
+    const nextIdx = (questionIndexRef.current + 1) % deckQuestionsRef.current.length
     setRevealAnswers(false)
     setTimeLeft(QUESTION_DURATION)
 
@@ -346,12 +378,24 @@ export default function TVPage() {
       .eq('session_id', currentPin)
 
     setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
-    setQuestionIndex((prev) => (prev + 1) % deckQuestionsRef.current.length)
+    setQuestionIndex(nextIdx)
 
     await supabase
       .from('rooms')
-      .update({ status: 'playing' })
+      .update({ status: `playing:${nextIdx}` })
       .eq('room_code', currentPin)
+  }
+
+  async function finishGame() {
+    stopTimerSound()
+    const currentPin = pin || pinRef.current
+    setGameFinished(true)
+    if (currentPin) {
+      await supabase
+        .from('rooms')
+        .update({ status: 'finished' })
+        .eq('room_code', currentPin)
+    }
   }
 
   async function replayGame() {
@@ -365,7 +409,7 @@ export default function TVPage() {
 
     await supabase
       .from('rooms')
-      .update({ status: 'waiting' })
+      .update({ status: 'waiting', game_type: selectedGame })
       .eq('room_code', currentPin)
 
     const shuffled = shuffleQuestions(QUESTIONS)
@@ -413,7 +457,6 @@ export default function TVPage() {
       `}</style>
 
       <div className="max-w-7xl w-full mx-auto space-y-6 flex-1 flex flex-col">
-        {/* Barre supérieure */}
         <div className="flex items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl">
           <span className="text-sm font-bold uppercase tracking-widest text-slate-400">
             Salon Animateur
@@ -446,7 +489,7 @@ export default function TVPage() {
         )}
 
         {!gameStarted ? (
-          <div className="max-w-3xl w-full mx-auto my-auto space-y-8 text-center">
+          <div className="max-w-4xl w-full mx-auto my-auto space-y-6 text-center">
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="space-y-2 text-center md:text-left">
                 <p className="text-sm uppercase tracking-widest text-slate-400">
@@ -471,6 +514,36 @@ export default function TVPage() {
                   QR Code...
                 </div>
               )}
+            </div>
+
+            {/* Choix du jeu */}
+            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
+                Choix du jeu
+              </p>
+              <div className="flex flex-wrap justify-center gap-4">
+                {GAME_OPTIONS.map((game) => {
+                  const active = selectedGame === game.id
+                  return (
+                    <button
+                      key={game.id}
+                      type="button"
+                      onClick={() => void handleSelectGame(game.id)}
+                      className={`px-6 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all cursor-pointer ${
+                        active
+                          ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      <span className="text-4xl">{game.icon}</span>
+                      <div>
+                        <p className="text-xl font-black">{game.title}</p>
+                        <p className="text-xs text-indigo-200 font-semibold">{game.subtitle}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
@@ -646,7 +719,7 @@ export default function TVPage() {
 
                 {revealAnswers && hasReachedLimit ? (
                   <button
-                    onClick={() => setGameFinished(true)}
+                    onClick={finishGame}
                     className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
                   >
                     🏆 Voir le podium final
