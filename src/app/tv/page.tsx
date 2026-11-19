@@ -52,6 +52,14 @@ const OPTION_STYLES: Record<string, string> = {
   D: 'bg-emerald-600/90 border-emerald-400',
 }
 
+// Bulles colorées associées à chaque lettre de choix
+const ANSWER_BUBBLE_STYLES: Record<string, string> = {
+  A: 'bg-rose-600 border-rose-300 text-white shadow-[0_0_14px_rgba(225,29,72,0.7)]',
+  B: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_14px_rgba(37,99,235,0.7)]',
+  C: 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_14px_rgba(251,191,36,0.7)]',
+  D: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_14px_rgba(5,150,105,0.7)]',
+}
+
 // Couleurs flashy distinctes pour les bordures des pastilles joueurs
 const FLASHY_BORDERS = [
   { border: 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.45)]', badge: 'text-cyan-300' },
@@ -346,6 +354,11 @@ export default function TVPage() {
               <div className="space-y-4">
                 {sortedPlayers.map((p, index) => {
                   const colorStyle = playerColorMap.get(p.id) || FLASHY_BORDERS[0]
+                  const answerBubbleStyle =
+                    p.answer && ANSWER_BUBBLE_STYLES[p.answer]
+                      ? ANSWER_BUBBLE_STYLES[p.answer]
+                      : 'bg-slate-700 border-slate-500 text-white'
+
                   return (
                     <div
                       key={p.id}
@@ -361,15 +374,25 @@ export default function TVPage() {
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-bold">
-                          {p.answer
-                            ? revealAnswers
-                              ? `Choix ${p.answer}`
-                              : '✓'
-                            : '...'}
-                        </span>
+                        {p.answer ? (
+                          revealAnswers ? (
+                            <span
+                              className={`w-11 h-11 rounded-full border-2 font-black text-2xl flex items-center justify-center shrink-0 ${answerBubbleStyle}`}
+                            >
+                              {p.answer}
+                            </span>
+                          ) : (
+                            <span className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-black text-lg flex items-center justify-center shrink-0">
+                              ✓
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-xl font-bold text-slate-500 px-2">...</span>
+                        )}
+
                         <span className="text-3xl md:text-4xl font-black text-white">
-                          {p.score ?? 0} <span className="text-xl font-bold text-slate-400">pts</span>
+                          {p.score ?? 0}{' '}
+                          <span className="text-xl font-bold text-slate-400">pts</span>
                         </span>
                       </div>
                     </div>
