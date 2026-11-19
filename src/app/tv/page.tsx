@@ -52,6 +52,18 @@ const OPTION_STYLES: Record<string, string> = {
   D: 'bg-emerald-600/90 border-emerald-400',
 }
 
+// Couleurs flashy distinctes pour les bordures des pastilles joueurs
+const FLASHY_BORDERS = [
+  { border: 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.45)]', badge: 'text-cyan-300' },
+  { border: 'border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.45)]', badge: 'text-fuchsia-300' },
+  { border: 'border-lime-400 shadow-[0_0_20px_rgba(163,230,53,0.45)]', badge: 'text-lime-300' },
+  { border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.45)]', badge: 'text-yellow-300' },
+  { border: 'border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.45)]', badge: 'text-orange-300' },
+  { border: 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.45)]', badge: 'text-rose-300' },
+  { border: 'border-violet-400 shadow-[0_0_20px_rgba(167,139,250,0.45)]', badge: 'text-violet-300' },
+  { border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]', badge: 'text-emerald-300' },
+]
+
 export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [playersList, setPlayersList] = useState<Player[]>([])
@@ -193,16 +205,24 @@ export default function TVPage() {
 
   const currentQuestion = QUESTIONS[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
+
+  // On associe une couleur fixe à chaque joueur selon son ordre d'arrivée
+  const playerColorMap = new Map<number, (typeof FLASHY_BORDERS)[number]>()
+  playersList.forEach((p, idx) => {
+    playerColorMap.set(p.id, FLASHY_BORDERS[idx % FLASHY_BORDERS.length])
+  })
+
   const sortedPlayers = [...playersList].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-slate-950 text-white">
-      <div className="max-w-4xl w-full text-center space-y-8">
+    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white">
+      <div className="max-w-7xl w-full mx-auto space-y-6 flex-1 flex flex-col">
+        {/* Barre supérieure */}
         <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl">
           <span className="text-sm font-bold uppercase tracking-widest text-slate-400">
             Salon Animateur
           </span>
-          <span className="text-lg font-black tracking-widest text-indigo-400">
+          <span className="text-xl font-black tracking-widest text-indigo-400">
             PIN : {pin || '----'}
           </span>
           <span className="text-sm font-semibold text-slate-300">
@@ -211,13 +231,13 @@ export default function TVPage() {
         </div>
 
         {dbError && (
-          <div className="p-4 bg-red-500/20 border border-red-500 text-red-300 rounded-xl text-sm font-semibold">
+          <div className="p-4 bg-red-500/20 border border-red-500 text-red-300 rounded-xl text-sm font-semibold text-center">
             Erreur Supabase : {dbError}
           </div>
         )}
 
         {!gameStarted ? (
-          <>
+          <div className="max-w-2xl w-full mx-auto my-auto space-y-8 text-center">
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl">
               <p className="text-sm uppercase tracking-widest text-slate-400 mb-2">
                 Code de la partie
@@ -238,14 +258,17 @@ export default function TVPage() {
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-3 justify-center">
-                  {playersList.map((p) => (
-                    <span
-                      key={p.id}
-                      className="px-4 py-2 bg-indigo-600/30 border border-indigo-500/50 rounded-xl font-semibold text-lg"
-                    >
-                      {p.pseudo}
-                    </span>
-                  ))}
+                  {playersList.map((p, idx) => {
+                    const style = FLASHY_BORDERS[idx % FLASHY_BORDERS.length]
+                    return (
+                      <span
+                        key={p.id}
+                        className={`px-5 py-2.5 bg-slate-900 border-4 ${style.border} rounded-full font-bold text-xl`}
+                      >
+                        {p.pseudo}
+                      </span>
+                    )
+                  })}
                 </div>
               )}
 
@@ -258,93 +281,100 @@ export default function TVPage() {
                 </button>
               )}
             </div>
-          </>
+          </div>
         ) : (
-          <div className="space-y-6">
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4">
-              <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
-                Question {questionIndex + 1} / {QUESTIONS.length}
-              </p>
-              <h1 className="text-3xl md:text-4xl font-black leading-tight">
-                {currentQuestion.question}
-              </h1>
-            </div>
+          /* Disposition en 2 colonnes : Question à gauche, Classement flashy à droite */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1">
+            {/* COLONNE GAUCHE : Question, 4 choix et contrôles animateur */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center">
+                <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                  Question {questionIndex + 1} / {QUESTIONS.length}
+                </p>
+                <h1 className="text-3xl md:text-4xl font-black leading-tight">
+                  {currentQuestion.question}
+                </h1>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-              {(['A', 'B', 'C', 'D'] as const).map((key) => {
-                const isCorrect = revealAnswers && currentQuestion.correct === key
-                return (
-                  <div
-                    key={key}
-                    className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
-                      OPTION_STYLES[key]
-                    } ${isCorrect ? 'ring-4 ring-white scale-[1.02]' : ''}`}
-                  >
-                    <span className="w-11 h-11 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
-                      {key}
-                    </span>
-                    <span className="text-xl font-bold">{currentQuestion.options[key]}</span>
-                  </div>
-                )
-              })}
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                {(['A', 'B', 'C', 'D'] as const).map((key) => {
+                  const isCorrect = revealAnswers && currentQuestion.correct === key
+                  return (
+                    <div
+                      key={key}
+                      className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+                        OPTION_STYLES[key]
+                      } ${isCorrect ? 'ring-4 ring-white scale-[1.02]' : ''}`}
+                    >
+                      <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
+                        {key}
+                      </span>
+                      <span className="text-2xl font-bold">{currentQuestion.options[key]}</span>
+                    </div>
+                  )
+                })}
+              </div>
 
-            <div className="bg-slate-900/70 border border-slate-800 p-6 rounded-2xl space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-slate-200">
-                  Réponses reçues : {answeredCount} / {playersList.length}
-                </h2>
-                <div className="flex gap-3">
+              {/* Barre de contrôle animateur */}
+              <div className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                <span className="text-lg font-bold text-slate-200">
+                  Réponses : {answeredCount} / {playersList.length}
+                </span>
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={toggleRevealAnswers}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition-all cursor-pointer"
+                    className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-lg rounded-xl transition-all cursor-pointer"
                   >
-                    {revealAnswers ? 'Masquer la réponse' : 'Révéler la réponse (+10 pts)'}
+                    {revealAnswers ? 'Masquer la réponse' : 'Révéler (+10 pts)'}
                   </button>
                   <button
                     onClick={nextQuestion}
-                    className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 text-white font-bold rounded-xl transition-all cursor-pointer"
+                    className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
                   >
-                    Question suivante →
+                    Suivante →
                   </button>
                 </div>
               </div>
+            </div>
 
-              <div className="flex flex-wrap gap-3 justify-center">
-                {playersList.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`px-4 py-2 rounded-xl border font-semibold flex items-center gap-2 ${
-                      p.answer
-                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-400'
-                    }`}
-                  >
-                    <span>{p.pseudo}</span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-black/30">
-                      {p.answer ? (revealAnswers ? `Choix ${p.answer}` : 'Prêt ✓') : 'Réfléchit...'}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            {/* COLONNE DROITE : Classement en direct avec pastilles flashy */}
+            <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-5">
+              <h2 className="text-sm uppercase tracking-widest text-indigo-300 font-bold text-center">
+                Classement en direct
+              </h2>
 
-              <div className="pt-4 border-t border-slate-800 text-left space-y-2">
-                <h3 className="text-xs uppercase tracking-widest text-indigo-300 font-bold">
-                  Classement en direct
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {sortedPlayers.map((p, index) => (
+              <div className="space-y-4">
+                {sortedPlayers.map((p, index) => {
+                  const colorStyle = playerColorMap.get(p.id) || FLASHY_BORDERS[0]
+                  return (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-xl"
+                      className={`bg-slate-900 border-4 ${colorStyle.border} rounded-3xl px-6 py-4 flex items-center justify-between gap-4 transition-all`}
                     >
-                      <span className="font-bold">
-                        #{index + 1} {p.pseudo}
-                      </span>
-                      <span className="font-black text-emerald-400">{p.score ?? 0} pts</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`text-2xl font-black shrink-0 ${colorStyle.badge}`}>
+                          #{index + 1}
+                        </span>
+                        <span className="text-3xl md:text-4xl font-black truncate">
+                          {p.pseudo}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-bold">
+                          {p.answer
+                            ? revealAnswers
+                              ? `Choix ${p.answer}`
+                              : '✓'
+                            : '...'}
+                        </span>
+                        <span className="text-3xl md:text-4xl font-black text-white">
+                          {p.score ?? 0} <span className="text-xl font-bold text-slate-400">pts</span>
+                        </span>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             </div>
           </div>
