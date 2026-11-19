@@ -2,163 +2,292 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
+import type { Viewport } from 'next'
 import { supabase } from '@/lib/supabase'
 
-const CHOICES = [
-  { key: 'A', label: 'A', color: 'bg-rose-600 hover:bg-rose-500 border-rose-400' },
-  { key: 'B', label: 'B', color: 'bg-blue-600 hover:bg-blue-500 border-blue-400' },
-  { key: 'C', label: 'C', color: 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-slate-950' },
-  { key: 'D', label: 'D', color: 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400' },
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
+type ChoiceKey = 'A' | 'B' | 'C' | 'D'
+
+const CHOICES: { key: ChoiceKey; label: string; style: string }[] = [
+  {
+    key: 'A',
+    label: 'A',
+    style: 'bg-rose-600 border-rose-300 text-white shadow-[0_0_24px_rgba(225,29,72,0.45)]',
+  },
+  {
+    key: 'B',
+    label: 'B',
+    style: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_24px_rgba(37,99,235,0.45)]',
+  },
+  {
+    key: 'C',
+    label: 'C',
+    style: 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_24px_rgba(251,191,36,0.45)]',
+  },
+  {
+    key: 'D',
+    label: 'D',
+    style: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_24px_rgba(5,150,105,0.45)]',
+  },
 ]
+
+const CLIENT_ID_STORAGE_KEY = 'quiz_player_client_id'
 
 function getOrCreateClientId(): string {
   if (typeof window === 'undefined') return ''
-  const key = 'quiz_client_id'
-  let id = window.localStorage.getItem(key)
-  if (!id) {
-    id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    window.localStorage.setItem(key, id)
+  let existing = window.localStorage.getItem(CLIENT_ID_STORAGE_KEY)
+  if (!existing) {
+    existing = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+    window.localStorage.setItem(CLIENT_ID_STORAGE_KEY, existing)
   }
-  return id
+  return existing
 }
 
-export default function PlayerPage() {
-  const [clientId, setClientId] = useState('')
-  const [roomCode, setRoomCode] = useState('')
-  const [pseudo, setPseudo] = useState('')
+function PlayerContent() {
+  const searchParams = useSearchParams()
+  const initialPin = (searchParams.get('pin') || '').replace(/\D/g, '').slice(0, 4)
+
+  const [pin, setPin] = useState<string>(initialPin)
+  const [pseudo, setPseudo] = useState<string>('')
+  const [joined, setJoined] = useState<boolean>(false)
   const [playerId, setPlayerId] = useState<number | null>(null)
+  const [selectedAnswer, setSelectedAnswer] = useState<ChoiceKey | null>(null)
   const [score, setScore] = useState<number>(0)
-  const [joined, setJoined] = useState(false)
-  const [gameStarted, setGameStarted] = useState(false)
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState('')
+  const [roomStatus, setRoomStatus] = useState<string>('waiting')
+  const [lastOutcome, setLastOutcome] = useState<'correct' | 'wrong' | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string>('')
+  const [loading, setLoading] = useState<boolean>(false)
+
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
+  const selectedAnswerRef = useRef<ChoiceKey | null>(null)
+  const lastPlayedRevealKeyRef = useRef<string>('')
 
   useEffect(() => {
-    setClientId(getOrCreateClientId())
+    selectedAnswerRef.current = selectedAnswer
+  }, [selectedAnswer])
 
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      const pinFromUrl = params.get('pin')
-      if (pinFromUrl) {
-        setRoomCode(pinFromUrl.replace(/\D/g, '').slice(0, 4))
+  useEffect(() => {
+    if (initialPin && !pin) {
+      setPin(initialPin)
+    }
+  }, [initialPin, pin])
+
+  // Empêche le défilement et le pincement/zoom sur l'écran joueur
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const preventTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 1 || e.cancelable) {
+        e.preventDefault()
+      }
+    }
+
+    const preventGesture = (e: Event) => {
+      e.preventDefault()
+    }
+
+    document.addEventListener('touchmove', preventTouchMove, { passive: false })
+    document.addEventListener('gesturestart', preventGesture, { passive: false })
+    document.addEventListener('gesturechange', preventGesture, { passive: false })
+
+    return () => {
+      document.removeEventListener('touchmove', preventTouchMove)
+      document.removeEventListener('gesturestart', preventGesture)
+      document.removeEventListener('gesturechange', preventGesture)
+    }
+  }, [])
+
+  // Maintien de l'écran allumé pendant la session joueur
+  const requestScreenWakeLock = useCallback(async () => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return
+    if (document.visibilityState !== 'visible') return
+
+    const nav = navigator as Navigator & {
+      wakeLock?: {
+        request: (type: 'screen') => Promise<{ release: () => Promise<void> }>
+      }
+    }
+
+    if (!nav.wakeLock) return
+
+    try {
+      if (wakeLockRef.current) return
+      wakeLockRef.current = await nav.wakeLock.request('screen')
+    } catch {
+      // Ignoré si le navigateur ou le mode économie d'énergie refuse le verrou
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!joined) return
+
+    void requestScreenWakeLock()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void requestScreenWakeLock()
+      } else if (wakeLockRef.current) {
+        void wakeLockRef.current.release().catch(() => {})
+        wakeLockRef.current = null
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (wakeLockRef.current) {
+        void wakeLockRef.current.release().catch(() => {})
+        wakeLockRef.current = null
+      }
+    }
+  }, [joined, requestScreenWakeLock])
+
+  const ensureAudioReady = useCallback(() => {
+    if (typeof window === 'undefined') return null
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextClass) return null
+
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new AudioContextClass()
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      void audioCtxRef.current.resume()
+    }
+    return audioCtxRef.current
+  }, [])
+
+  const playOutcomeSound = useCallback(
+    (isCorrect: boolean) => {
+      const ctx = ensureAudioReady()
+      if (!ctx) return
+
+      const now = ctx.currentTime
+
+      if (isCorrect) {
+        // Double note claire et ascendante (validation)
+        const notes = [587.33, 880] // D5 -> A5
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          const startAt = now + i * 0.11
+          osc.type = 'triangle'
+          osc.frequency.setValueAtTime(freq, startAt)
+          gain.gain.setValueAtTime(0.001, startAt)
+          gain.gain.linearRampToValueAtTime(0.18, startAt + 0.02)
+          gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.24)
+          osc.connect(gain)
+          gain.connect(ctx.destination)
+          osc.start(startAt)
+          osc.stop(startAt + 0.25)
+        })
+      } else {
+        // Son grave descendant (erreur)
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(220, now)
+        osc.frequency.linearRampToValueAtTime(135, now + 0.28)
+        gain.gain.setValueAtTime(0.001, now)
+        gain.gain.linearRampToValueAtTime(0.14, now + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(now)
+        osc.stop(now + 0.31)
+      }
+    },
+    [ensureAudioReady]
+  )
+
+  useEffect(() => {
+    return () => {
+      if (audioCtxRef.current) {
+        void audioCtxRef.current.close()
+        audioCtxRef.current = null
       }
     }
   }, [])
 
-  // Rejoindre ou reprendre la session de ce smartphone
-  async function joinRoom(e: React.FormEvent) {
-    e.preventDefault()
-    setErrorMsg('')
-
-    const cleanCode = roomCode.trim()
-    const cleanPseudo = pseudo.trim()
-
-    if (!cleanCode || !cleanPseudo) {
-      setErrorMsg('Entre un code PIN et un pseudo.')
-      return
-    }
-
-    const activeClientId = clientId || getOrCreateClientId()
-
-    const { data: room, error: roomError } = await supabase
-      .from('rooms')
-      .select('room_code, status')
-      .eq('room_code', cleanCode)
-      .single()
-
-    if (roomError || !room) {
-      setErrorMsg('Salon introuvable avec ce code PIN.')
-      return
-    }
-
-    // 1. Vérifie si CE smartphone a déjà une ligne dans ce salon
-    const { data: existingDevicePlayer, error: findError } = await supabase
-      .from('players')
-      .select('id, pseudo, score, answer')
-      .eq('session_id', cleanCode)
-      .eq('client_id', activeClientId)
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (findError) {
-      setErrorMsg(findError.message)
-      return
-    }
-
-    if (existingDevicePlayer) {
-      if (existingDevicePlayer.pseudo !== cleanPseudo) {
-        await supabase
-          .from('players')
-          .update({ pseudo: cleanPseudo })
-          .eq('id', existingDevicePlayer.id)
-      }
-
-      setPlayerId(existingDevicePlayer.id)
-      setPseudo(cleanPseudo)
-      setScore(existingDevicePlayer.score ?? 0)
-      setSelectedAnswer(existingDevicePlayer.answer ?? null)
-      setJoined(true)
-      if (room.status === 'playing') {
-        setGameStarted(true)
-      }
-      return
-    }
-
-    // 2. Sinon, création d'un nouveau joueur
-    const { data: player, error: playerError } = await supabase
-      .from('players')
-      .insert([
-        {
-          room_code: cleanCode,
-          session_id: cleanCode,
-          client_id: activeClientId,
-          pseudo: cleanPseudo,
-          score: 0,
-        },
-      ])
-      .select()
-      .single()
-
-    if (playerError || !player) {
-      setErrorMsg(playerError?.message || 'Erreur inconnue')
-      return
-    }
-
-    setPlayerId(player.id)
-    setScore(player.score ?? 0)
-    setSelectedAnswer(null)
-    setJoined(true)
-    if (room.status === 'playing') {
-      setGameStarted(true)
-    }
-  }
-
-  // Écouter l'état de la partie et les mises à jour du joueur (dont le score)
+  // Écoute des changements de statut du salon (révélation, question suivante, fin)
   useEffect(() => {
-    if (!joined || !roomCode || !playerId) return
+    if (!joined || !pin) return
+
+    async function syncInitialRoom() {
+      const { data } = await supabase
+        .from('rooms')
+        .select('status')
+        .eq('room_code', pin)
+        .maybeSingle()
+
+      if (data?.status) {
+        setRoomStatus(data.status)
+      }
+    }
+    void syncInitialRoom()
 
     const channel = supabase
-      .channel('player-room-' + roomCode + '-' + playerId)
+      .channel('player-room-' + pin + '-' + (playerId ?? 'anon'))
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'rooms',
-          filter: `room_code=eq.${roomCode}`,
+          filter: `room_code=eq.${pin}`,
         },
         (payload) => {
-          if (payload.new.status === 'playing') {
-            setGameStarted(true)
+          const nextStatus = String((payload.new as { status?: string })?.status || '')
+          setRoomStatus(nextStatus)
+
+          if (nextStatus.startsWith('playing:')) {
             setSelectedAnswer(null)
+            setLastOutcome(null)
+          } else if (nextStatus === 'waiting') {
+            setSelectedAnswer(null)
+            setLastOutcome(null)
+            setScore(0)
+            lastPlayedRevealKeyRef.current = ''
+          } else if (nextStatus.startsWith('revealed:')) {
+            const parts = nextStatus.split(':')
+            const qIdx = parts[1] || '0'
+            const correctLetter = (parts[2] || '') as ChoiceKey | ''
+            const revealKey = `${qIdx}:${correctLetter}`
+            const chosen = selectedAnswerRef.current
+
+            if (chosen && correctLetter && lastPlayedRevealKeyRef.current !== revealKey) {
+              lastPlayedRevealKeyRef.current = revealKey
+              const isCorrect = chosen === correctLetter
+              setLastOutcome(isCorrect ? 'correct' : 'wrong')
+              playOutcomeSound(isCorrect)
+            }
           }
         }
       )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [joined, pin, playerId, playOutcomeSound])
+
+  // Écoute des mises à jour du joueur (score / réinitialisation réponse)
+  useEffect(() => {
+    if (!joined || !playerId) return
+
+    const channel = supabase
+      .channel('player-self-' + playerId)
       .on(
         'postgres_changes',
         {
@@ -168,10 +297,11 @@ export default function PlayerPage() {
           filter: `id=eq.${playerId}`,
         },
         (payload) => {
-          if (typeof payload.new.score === 'number') {
-            setScore(payload.new.score)
+          const row = payload.new as { score?: number | null; answer?: string | null }
+          if (typeof row.score === 'number') {
+            setScore(row.score)
           }
-          if ('answer' in payload.new && payload.new.answer === null) {
+          if (row.answer === null) {
             setSelectedAnswer(null)
           }
         }
@@ -181,128 +311,266 @@ export default function PlayerPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [joined, roomCode, playerId])
+  }, [joined, playerId])
 
-  // Envoyer la réponse (A, B, C ou D)
-  async function sendAnswer(choiceKey: string) {
-    if (!playerId || selectedAnswer) return
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault()
+    setErrorMsg('')
+    ensureAudioReady()
+    void requestScreenWakeLock()
 
-    setSelectedAnswer(choiceKey)
+    const cleanPin = pin.trim()
+    const cleanPseudo = pseudo.trim()
+
+    if (cleanPin.length !== 4) {
+      setErrorMsg('Entre un code PIN à 4 chiffres.')
+      return
+    }
+    if (!cleanPseudo) {
+      setErrorMsg('Entre ton prénom ou pseudo.')
+      return
+    }
+
+    setLoading(true)
+
+    const { data: room, error: roomErr } = await supabase
+      .from('rooms')
+      .select('room_code, status')
+      .eq('room_code', cleanPin)
+      .maybeSingle()
+
+    if (roomErr || !room) {
+      setLoading(false)
+      setErrorMsg('Salon introuvable. Vérifie le PIN.')
+      return
+    }
+
+    const clientId = getOrCreateClientId()
+
+    const { data: existingPlayer } = await supabase
+      .from('players')
+      .select('id, score, answer')
+      .eq('session_id', cleanPin)
+      .eq('client_id', clientId)
+      .maybeSingle()
+
+    if (existingPlayer) {
+      const { error: updErr } = await supabase
+        .from('players')
+        .update({ pseudo: cleanPseudo })
+        .eq('id', existingPlayer.id)
+
+      setLoading(false)
+      if (updErr) {
+        setErrorMsg(updErr.message)
+        return
+      }
+
+      setPlayerId(existingPlayer.id)
+      setScore(existingPlayer.score ?? 0)
+      setSelectedAnswer((existingPlayer.answer as ChoiceKey | null) ?? null)
+      setRoomStatus(room.status || 'waiting')
+      setJoined(true)
+      return
+    }
+
+    const { data: inserted, error: insErr } = await supabase
+      .from('players')
+      .insert([
+        {
+          session_id: cleanPin,
+          pseudo: cleanPseudo,
+          client_id: clientId,
+          score: 0,
+          answer: null,
+        },
+      ])
+      .select('id, score')
+      .single()
+
+    setLoading(false)
+    if (insErr || !inserted) {
+      setErrorMsg(insErr?.message || 'Impossible de rejoindre le salon.')
+      return
+    }
+
+    setPlayerId(inserted.id)
+    setScore(inserted.score ?? 0)
+    setSelectedAnswer(null)
+    setRoomStatus(room.status || 'waiting')
+    setJoined(true)
+  }
+
+  async function handleSelectAnswer(choice: ChoiceKey) {
+    if (!playerId) return
+    ensureAudioReady()
+    void requestScreenWakeLock()
+
+    setSelectedAnswer(choice)
 
     const { error } = await supabase
       .from('players')
-      .update({ answer: choiceKey })
+      .update({ answer: choice })
       .eq('id', playerId)
 
     if (error) {
-      console.error('Erreur envoi réponse:', error)
-      setSelectedAnswer(null)
+      setErrorMsg(error.message)
     }
   }
 
+  const isRevealed = roomStatus.startsWith('revealed:')
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-slate-950 text-white">
+    <main className="h-dvh w-screen overflow-hidden overscroll-none select-none touch-none bg-slate-950 text-white flex flex-col justify-between p-5">
       {!joined ? (
-        <form onSubmit={joinRoom} className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-5 shadow-2xl">
-          <h1 className="text-2xl font-bold text-center">Rejoindre la Partie</h1>
+        <form
+          onSubmit={handleJoin}
+          className="max-w-md w-full mx-auto my-auto bg-slate-900 border border-slate-800 p-7 rounded-3xl shadow-2xl space-y-5"
+        >
+          <div className="text-center space-y-1">
+            <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+              Manette Joueur
+            </p>
+            <h1 className="text-3xl font-black">Rejoindre la partie</h1>
+          </div>
 
           {errorMsg && (
-            <div className="p-3 bg-red-500/20 border border-red-500 text-red-300 rounded-xl text-sm text-center font-semibold">
+            <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500 text-rose-200 text-sm font-semibold text-center">
               {errorMsg}
             </div>
           )}
 
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-slate-400 mb-1">
-              Code PIN à 4 chiffres
+          <div className="space-y-2">
+            <label className="block text-xs uppercase tracking-wider text-slate-400 font-bold">
+              Code PIN (4 chiffres)
             </label>
             <input
               type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
               maxLength={4}
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center text-2xl font-bold tracking-widest"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="1234"
+              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-center text-3xl font-black tracking-widest"
             />
           </div>
 
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-slate-400 mb-1">
-              Ton pseudo
+          <div className="space-y-2">
+            <label className="block text-xs uppercase tracking-wider text-slate-400 font-bold">
+              Ton prénom
             </label>
             <input
               type="text"
-              maxLength={20}
+              maxLength={24}
               value={pseudo}
               onChange={(e) => setPseudo(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-lg"
-              placeholder="Pseudo"
+              placeholder="Ex : Thomas"
+              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-lg rounded-2xl transition-all cursor-pointer"
+            disabled={loading}
+            className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xl transition-colors"
           >
-            C'est parti !
+            {loading ? 'Connexion...' : '🎮 Entrer dans le salon'}
           </button>
         </form>
-      ) : !gameStarted ? (
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-3xl text-center space-y-4">
-          <p className="text-sm uppercase tracking-widest text-indigo-400 font-bold">Connecté • Salon {roomCode}</p>
-          <h2 className="text-3xl font-black">{pseudo}</h2>
-          <p className="text-emerald-400 font-bold text-lg">{score} pts</p>
-          <p className="text-slate-400 animate-pulse">En attente du lancement par l'animateur...</p>
-        </div>
       ) : (
-        <div className="w-full max-w-md space-y-5">
-          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-5 py-3 rounded-2xl">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-slate-400">Joueur</p>
-              <p className="font-bold text-base">{pseudo}</p>
+        <>
+          {/* En-tête joueur */}
+          <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 px-4 py-3 rounded-2xl">
+            <div className="min-w-0">
+              <p className="text-xs text-slate-400 font-bold">PIN {pin}</p>
+              <p className="text-lg font-black truncate">{pseudo}</p>
             </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wider text-slate-400">Score</p>
-              <p className="font-black text-xl text-emerald-400">{score} pts</p>
+            <div className="text-right shrink-0">
+              <p className="text-xs text-slate-400 font-bold">Score</p>
+              <p className="text-2xl font-black text-indigo-300">{score} pts</p>
             </div>
           </div>
 
-          <div className="text-center">
-            <h2 className="text-2xl font-black">Choisis ta réponse !</h2>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {CHOICES.map((btn) => {
-              const isSelected = selectedAnswer === btn.key
-              const isDisabled = selectedAnswer !== null
+          {/* Zone centrale : boutons A, B, C, D */}
+          <div className="flex-1 grid grid-cols-2 gap-4 my-4">
+            {CHOICES.map((item) => {
+              const isSelected = selectedAnswer === item.key
+              const dimOther = Boolean(selectedAnswer) && !isSelected
 
               return (
                 <button
-                  key={btn.key}
-                  disabled={isDisabled}
-                  onClick={() => sendAnswer(btn.key)}
-                  className={`h-32 rounded-3xl border-2 font-black text-5xl flex items-center justify-center transition-all shadow-xl ${btn.color} ${
+                  key={item.key}
+                  type="button"
+                  disabled={isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'}
+                  onClick={() => void handleSelectAnswer(item.key)}
+                  className={`rounded-3xl border-4 flex items-center justify-center text-6xl font-black transition-all ${
+                    item.style
+                  } ${
                     isSelected
-                      ? 'scale-105 ring-4 ring-white'
-                      : isDisabled
-                      ? 'opacity-35 cursor-not-allowed'
-                      : 'active:scale-95 cursor-pointer'
+                      ? 'ring-4 ring-white scale-[0.98] brightness-110'
+                      : dimOther
+                      ? 'opacity-40 scale-[0.96]'
+                      : 'active:scale-95'
                   }`}
                 >
-                  {btn.label}
+                  {item.label}
                 </button>
               )
             })}
           </div>
 
-          {selectedAnswer && (
-            <div className="p-4 bg-indigo-500/20 border border-indigo-400 text-indigo-200 rounded-2xl text-center font-bold">
-              Réponse <span className="text-white underline">{selectedAnswer}</span> envoyée ! Regarde la TV.
-            </div>
-          )}
-        </div>
+          {/* Pied d'écran : statut */}
+          <div className="bg-slate-900/90 border border-slate-800 px-4 py-3 rounded-2xl text-center">
+            {roomStatus === 'waiting' && (
+              <p className="text-sm font-bold text-slate-300">
+                En attente du lancement sur la TV...
+              </p>
+            )}
+            {roomStatus === 'finished' && (
+              <p className="text-sm font-black text-amber-300">
+                Partie terminée — regarde le podium sur la TV !
+              </p>
+            )}
+            {isRevealed && lastOutcome === 'correct' && (
+              <p className="text-base font-black text-emerald-400">
+                Bonne réponse (+10 pts)
+              </p>
+            )}
+            {isRevealed && lastOutcome === 'wrong' && (
+              <p className="text-base font-black text-rose-400">
+                Mauvaise réponse (-5 pts)
+              </p>
+            )}
+            {isRevealed && !lastOutcome && (
+              <p className="text-sm font-bold text-slate-400">
+                Réponse révélée sur la TV
+              </p>
+            )}
+            {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
+              <p className="text-sm font-bold text-indigo-300">
+                {selectedAnswer
+                  ? `Choix ${selectedAnswer} enregistré — tu peux changer tant que le chrono tourne`
+                  : 'Choisis A, B, C ou D avant la fin du chrono'}
+              </p>
+            )}
+          </div>
+        </>
       )}
     </main>
+  )
+}
+
+export default function PlayerPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="h-dvh w-screen overflow-hidden bg-slate-950 text-white flex items-center justify-center font-bold">
+          Chargement...
+        </main>
+      }
+    >
+      <PlayerContent />
+    </Suspense>
   )
 }
