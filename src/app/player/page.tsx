@@ -487,6 +487,7 @@ function PlayerContent() {
     }
   }
 
+  const isGameStarted = roomStatus.startsWith('playing') || roomStatus.startsWith('revealed:')
   const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
   const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
   const pillStyle = getPlayerColorStyle(playerId ?? 0)
@@ -499,13 +500,15 @@ function PlayerContent() {
       {!joined ? (
         <form
           onSubmit={handleJoin}
-          className="max-w-md w-full mx-auto my-auto bg-slate-900 border border-slate-800 p-7 rounded-3xl shadow-2xl space-y-5"
+          className="max-w-md w-full mx-auto my-auto bg-slate-900 border-2 border-fuchsia-500/80 shadow-[0_0_30px_rgba(217,70,239,0.3)] p-7 rounded-3xl space-y-5"
         >
           <div className="text-center space-y-1">
-            <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+            <p className="text-xs uppercase tracking-widest text-cyan-300 font-bold">
               Manette Joueur
             </p>
-            <h1 className="text-3xl font-black">Rejoindre la partie</h1>
+            <h1 className="text-3xl font-black bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+              Rejoindre la partie
+            </h1>
           </div>
 
           {errorMsg && (
@@ -515,7 +518,7 @@ function PlayerContent() {
           )}
 
           <div className="space-y-2">
-            <label className="block text-xs uppercase tracking-wider text-slate-400 font-bold">
+            <label className="block text-xs uppercase tracking-wider text-cyan-300 font-bold">
               Code PIN (4 chiffres)
             </label>
             <input
@@ -527,12 +530,12 @@ function PlayerContent() {
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="1234"
               style={{ touchAction: 'manipulation' }}
-              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-center text-3xl font-black tracking-widest"
+              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-cyan-400/70 focus:border-fuchsia-400 outline-none text-center text-3xl font-black tracking-widest shadow-[0_0_16px_rgba(34,211,238,0.2)]"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs uppercase tracking-wider text-slate-400 font-bold">
+            <label className="block text-xs uppercase tracking-wider text-fuchsia-300 font-bold">
               Ton prénom
             </label>
             <input
@@ -542,7 +545,7 @@ function PlayerContent() {
               onChange={(e) => setPseudo(e.target.value)}
               placeholder="Ex : Thomas"
               style={{ touchAction: 'manipulation' }}
-              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold"
+              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-fuchsia-500/70 focus:border-cyan-300 outline-none text-xl font-bold shadow-[0_0_16px_rgba(217,70,239,0.2)]"
             />
           </div>
 
@@ -550,7 +553,7 @@ function PlayerContent() {
             type="submit"
             disabled={loading}
             style={{ touchAction: 'manipulation' }}
-            className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xl transition-colors touch-manipulation"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-lime-400 via-emerald-400 to-cyan-300 hover:brightness-110 disabled:opacity-50 text-slate-950 font-black text-xl transition-all shadow-[0_0_24px_rgba(163,230,53,0.45)] touch-manipulation"
           >
             {loading ? 'Connexion...' : '🎮 Entrer dans le salon'}
           </button>
@@ -559,16 +562,16 @@ function PlayerContent() {
         <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4">
           {/* Pastille joueur positionnée sous la Dynamic Island avec la même couleur que sur la TV */}
           <div
-            className={`bg-slate-900 border-2 ${pillStyle.pillBorder} ${pillStyle.pillGlow} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
+            className={`bg-slate-900 ${pillStyle.pillBg} border-4 ${pillStyle.pillBorder} ${pillStyle.pillGlow} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
           >
             <div className="flex items-center gap-3 min-w-0">
               <span
-                className={`px-3 py-1 rounded-2xl border text-xl font-black shrink-0 ${pillStyle.rankBadge}`}
+                className={`px-3 py-1 rounded-2xl border-2 text-xl font-black shrink-0 ${pillStyle.rankBadge}`}
               >
                 #{rank}
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                <p className="text-[11px] uppercase tracking-wider text-slate-300 font-bold">
                   PIN {pin}
                 </p>
                 <p className="text-xl font-black truncate">{pseudo}</p>
@@ -576,15 +579,15 @@ function PlayerContent() {
             </div>
 
             <div className="text-right shrink-0">
-              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+              <p className="text-[11px] uppercase tracking-wider text-slate-300 font-bold">
                 Score
               </p>
               <p className="text-2xl font-black text-white">{score} pts</p>
             </div>
           </div>
 
-          {/* Zone des 4 boutons du Quiz */}
-          {gameType === 'quiz' && (
+          {/* Zone des 4 boutons du Quiz : visible uniquement une fois le jeu démarré */}
+          {gameType === 'quiz' && isGameStarted && (
             <div className="grid grid-cols-2 gap-3">
               {CHOICES.map((item) => {
                 const isSelected = selectedAnswer === item.key
