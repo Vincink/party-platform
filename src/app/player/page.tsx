@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Viewport } from 'next'
 import { supabase } from '@/lib/supabase'
+import { getPlayerColorStyle } from '@/lib/playerColors'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -112,7 +113,6 @@ function PlayerContent() {
     }
   }, [initialPin, pin])
 
-  // Blocage du scroll, du pincement et du double-tap zoom sur iOS
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -283,6 +283,10 @@ function PlayerContent() {
     }
     void syncRoom()
 
+    const pollInterval = window.setInterval(() => {
+      void syncRoom()
+    }, 1500)
+
     const channel = supabase
       .channel('player-room-' + pin + '-' + (playerId ?? 'anon'))
       .on(
@@ -306,6 +310,7 @@ function PlayerContent() {
       .subscribe()
 
     return () => {
+      window.clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
   }, [joined, pin, playerId, applyRoomStatus, refreshRank])
@@ -417,6 +422,7 @@ function PlayerContent() {
 
       lockedAnswerRef.current = restoredAnswer
       submittingAnswerRef.current = false
+      setPseudo(cleanPseudo)
       setPlayerId(existingPlayer.id)
       setScore(existingPlayer.score ?? 0)
       setSelectedAnswer(restoredAnswer)
@@ -451,6 +457,7 @@ function PlayerContent() {
 
     lockedAnswerRef.current = null
     submittingAnswerRef.current = false
+    setPseudo(cleanPseudo)
     setPlayerId(inserted.id)
     setScore(inserted.score ?? 0)
     setSelectedAnswer(null)
@@ -482,6 +489,7 @@ function PlayerContent() {
 
   const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
   const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
+  const pillStyle = getPlayerColorStyle(playerId ?? 0)
 
   return (
     <main
@@ -549,10 +557,14 @@ function PlayerContent() {
         </form>
       ) : (
         <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4">
-          {/* Pastille joueur positionnée sous la Dynamic Island */}
-          <div className="bg-slate-900 border-2 border-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.25)] px-4 py-3 rounded-3xl flex items-center justify-between gap-3">
+          {/* Pastille joueur positionnée sous la Dynamic Island avec la même couleur que sur la TV */}
+          <div
+            className={`bg-slate-900 border-2 ${pillStyle.pillBorder} ${pillStyle.pillGlow} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
+          >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="px-3 py-1 rounded-2xl bg-cyan-400/15 border border-cyan-400/50 text-cyan-300 text-xl font-black shrink-0">
+              <span
+                className={`px-3 py-1 rounded-2xl border text-xl font-black shrink-0 ${pillStyle.rankBadge}`}
+              >
                 #{rank}
               </span>
               <div className="min-w-0">
