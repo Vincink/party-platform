@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface Player {
@@ -71,122 +71,6 @@ const FLASHY_BORDERS = [
   { border: 'border-violet-400 shadow-[0_0_20px_rgba(167,139,250,0.45)]', badge: 'text-violet-300' },
   { border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]', badge: 'text-emerald-300' },
 ]
-
-// Générateur de QR Code matriciel léger (Version 2 / 25x25 modules, encodage alphanumérique déterministe)
-function buildQrMatrix(text: string): boolean[][] {
-  const size = 25
-  const matrix: (boolean | null)[][] = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => null)
-  )
-
-  const placeFinder = (top: number, left: number) => {
-    for (let r = -1; r <= 7; r++) {
-      for (let c = -1; c <= 7; c++) {
-        const rr = top + r
-        const cc = left + c
-        if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue
-        const inBorder = r === -1 || r === 7 || c === -1 || c === 7
-        const inOuter = r === 0 || r === 6 || c === 0 || c === 6
-        const inInner = r >= 2 && r <= 4 && c >= 2 && c <= 4
-        matrix[rr][cc] = !inBorder && (inOuter || inInner)
-      }
-    }
-  }
-
-  placeFinder(0, 0)
-  placeFinder(0, size - 7)
-  placeFinder(size - 7, 0)
-
-  // Timing patterns
-  for (let i = 8; i < size - 8; i++) {
-    matrix[6][i] = i % 2 === 0
-    matrix[i][6] = i % 2 === 0
-  }
-
-  // Alignment pattern at (18, 18)
-  for (let r = -2; r <= 2; r++) {
-    for (let c = -2; c <= 2; c++) {
-      const rr = 18 + r
-      const cc = 18 + c
-      if (matrix[rr][cc] === null) {
-        matrix[rr][cc] = Math.abs(r) === 2 || Math.abs(c) === 2 || (r === 0 && c === 0)
-      }
-    }
-  }
-
-  // Format info zone reserved
-  for (let i = 0; i < size; i++) {
-    if (matrix[8][i] === null) matrix[8][i] = false
-    if (matrix[i][8] === null) matrix[i][8] = false
-  }
-  matrix[size - 8][8] = true
-
-  // Convert text into bit stream
-  const bits: number[] = []
-  const bytes = new TextEncoder().encode(text)
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i]
-    for (let bit = 7; bit >= 0; bit--) {
-      bits.push((b >> bit) & 1)
-    }
-  }
-
-  // Pad stream deterministically
-  let hash = 2166136261
-  for (let i = 0; i < bytes.length; i++) {
-    hash ^= bytes[i]
-    hash = Math.imul(hash, 16777619)
-  }
-  while (bits.length < 400) {
-    hash ^= hash << 13
-    hash ^= hash >>> 17
-    hash ^= hash << 5
-    bits.push(hash & 1)
-  }
-
-  let bitIdx = 0
-  let upward = true
-  for (let col = size - 1; col > 0; col -= 2) {
-    if (col === 6) col--
-    const rows = upward
-      ? Array.from({ length: size }, (_, idx) => size - 1 - idx)
-      : Array.from({ length: size }, (_, idx) => idx)
-
-    for (const row of rows) {
-      for (const c of [col, col - 1]) {
-        if (matrix[row][c] === null) {
-          const rawBit = bits[bitIdx % bits.length]
-          const mask = (row + c) % 2 === 0 ? 1 : 0
-          matrix[row][c] = (rawBit ^ mask) === 1
-          bitIdx++
-        }
-      }
-    }
-    upward = !upward
-  }
-
-  return matrix.map((row) => row.map((cell) => Boolean(cell)))
-}
-
-function QrCodeSvg({ value }: { value: string }) {
-  const modules = useMemo(() => buildQrMatrix(value || 'https://example.com/player'), [value])
-  const count = modules.length
-
-  return (
-    <svg
-      viewBox={`0 0 ${count} ${count}`}
-      className="w-40 h-40 md:w-44 md:h-44 bg-white p-2.5 rounded-2xl shadow-lg shrink-0"
-      role="img"
-      aria-label="QR Code pour rejoindre la partie"
-    >
-      {modules.map((row, r) =>
-        row.map((dark, c) =>
-          dark ? <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill="#020617" /> : null
-        )
-      )}
-    </svg>
-  )
-}
 
 function getDisplayName(player: Player, allPlayers: Player[]) {
   const sameNamePlayers = [...allPlayers]
@@ -389,7 +273,17 @@ export default function TVPage() {
                 </p>
               </div>
 
-              <QrCodeSvg value={joinUrl || `https://example.com/player?pin=${pin}`} />
+              {joinUrl ? (
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(joinUrl)}`}
+                  alt="QR Code pour rejoindre la partie"
+                  className="w-40 h-40 md:w-44 md:h-44 bg-white p-2 rounded-2xl shadow-lg shrink-0"
+                />
+              ) : (
+                <div className="w-40 h-40 md:w-44 md:h-44 bg-slate-800 rounded-2xl flex items-center justify-center text-xs text-slate-400 shrink-0">
+                  QR Code...
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
