@@ -9,6 +9,7 @@ interface Player {
   id: number
   pseudo: string
   answer?: string | null
+  score?: number | null
 }
 
 const QUESTIONS = [
@@ -58,6 +59,7 @@ export default function TVPage() {
   const [gameStarted, setGameStarted] = useState<boolean>(false)
   const [questionIndex, setQuestionIndex] = useState<number>(0)
   const [revealAnswers, setRevealAnswers] = useState<boolean>(false)
+  const [scoredQuestionIndex, setScoredQuestionIndex] = useState<number | null>(null)
 
   const initialized = useRef(false)
   const pinRef = useRef<string>('')
@@ -95,7 +97,9 @@ export default function TVPage() {
         (payload) => {
           const newPlayer = payload.new as Player
           setPlayersList((prev) =>
-            prev.some((p) => p.id === newPlayer.id) ? prev : [...prev, newPlayer]
+            prev.some((p) => p.id === newPlayer.id)
+              ? prev
+              : [...prev, { ...newPlayer, score: newPlayer.score ?? 0 }]
           )
         }
       )
@@ -110,7 +114,11 @@ export default function TVPage() {
         (payload) => {
           const updatedPlayer = payload.new as Player
           setPlayersList((prev) =>
-            prev.map((p) => (p.id === updatedPlayer.id ? { ...p, ...updatedPlayer } : p))
+            prev.map((p) =>
+              p.id === updatedPlayer.id
+                ? { ...p, ...updatedPlayer, score: updatedPlayer.score ?? p.score ?? 0 }
+                : p
+            )
           )
         }
       )
@@ -135,14 +143,40 @@ export default function TVPage() {
       setGameStarted(true)
       setQuestionIndex(0)
       setRevealAnswers(false)
+      setScoredQuestionIndex(null)
     }
+  }
+
+  async function toggleRevealAnswers() {
+    const currentQuestion = QUESTIONS[questionIndex]
+
+    if (!revealAnswers && scoredQuestionIndex !== questionIndex) {
+      setScoredQuestionIndex(questionIndex)
+
+      const updatedList = await Promise.all(
+        playersList.map(async (p) => {
+          if (p.answer === currentQuestion.correct) {
+            const nextScore = (p.score ?? 0) + 10
+            await supabase
+              .from('players')
+              .update({ score: nextScore })
+              .eq('id', p.id)
+            return { ...p, score: nextScore }
+          }
+          return p
+        })
+      )
+
+      setPlayersList(updatedList)
+    }
+
+    setRevealAnswers((prev) => !prev)
   }
 
   async function nextQuestion() {
     const currentPin = pin || pinRef.current
     setRevealAnswers(false)
 
-    // Réinitialise les réponses des joueurs dans Supabase
     await supabase
       .from('players')
       .update({ answer: null })
@@ -151,7 +185,6 @@ export default function TVPage() {
     setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
     setQuestionIndex((prev) => (prev + 1) % QUESTIONS.length)
 
-    // Notifie le salon pour réactiver les boutons sur les smartphones
     await supabase
       .from('rooms')
       .update({ status: 'playing' })
@@ -160,6 +193,7 @@ export default function TVPage() {
 
   const currentQuestion = QUESTIONS[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
+  const sortedPlayers = [...playersList].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-slate-950 text-white">
@@ -255,17 +289,17 @@ export default function TVPage() {
               })}
             </div>
 
-            <div className="bg-slate-900/70 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="bg-slate-900/70 border border-slate-800 p-6 rounded-2xl space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-slate-200">
                   Réponses reçues : {answeredCount} / {playersList.length}
                 </h2>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setRevealAnswers((prev) => !prev)}
+                    onClick={toggleRevealAnswers}
                     className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition-all cursor-pointer"
                   >
-                    {revealAnswers ? 'Masquer la bonne réponse' : 'Révéler la réponse'}
+                    {revealAnswers ? 'Masquer la réponse' : 'Révéler la réponse (+10 pts)'}
                   </button>
                   <button
                     onClick={nextQuestion}
@@ -292,6 +326,25 @@ export default function TVPage() {
                     </span>
                   </div>
                 ))}
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 text-left space-y-2">
+                <h3 className="text-xs uppercase tracking-widest text-indigo-300 font-bold">
+                  Classement en direct
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {sortedPlayers.map((p, index) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-4 py-2.5 rounded-xl"
+                    >
+                      <span className="font-bold">
+                        #{index + 1} {p.pseudo}
+                      </span>
+                      <span className="font-black text-emerald-400">{p.score ?? 0} pts</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
