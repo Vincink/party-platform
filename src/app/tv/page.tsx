@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { QUESTIONS } from '@/data/questions'
 
 interface Player {
   id: number
@@ -11,39 +12,6 @@ interface Player {
   answer?: string | null
   score?: number | null
 }
-
-const QUESTIONS = [
-  {
-    question: 'Quelle est la capitale de la Belgique ?',
-    options: {
-      A: 'Anvers',
-      B: 'Bruxelles',
-      C: 'Liège',
-      D: 'Gand',
-    },
-    correct: 'B',
-  },
-  {
-    question: 'Combien y a-t-il de boules numérotées dans un jeu de billard américain standard ?',
-    options: {
-      A: '12',
-      B: '14',
-      C: '15',
-      D: '16',
-    },
-    correct: 'C',
-  },
-  {
-    question: 'Quelle planète est surnommée la planète rouge ?',
-    options: {
-      A: 'Mars',
-      B: 'Jupiter',
-      C: 'Vénus',
-      D: 'Saturne',
-    },
-    correct: 'A',
-  },
-]
 
 const OPTION_STYLES: Record<string, string> = {
   A: 'bg-rose-600/90 border-rose-400',
