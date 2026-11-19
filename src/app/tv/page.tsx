@@ -55,16 +55,69 @@ const ANSWER_BUBBLE_STYLES: Record<string, string> = {
   D: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_14px_rgba(5,150,105,0.7)]',
 }
 
-const FLASHY_BORDERS = [
-  { border: 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.45)]', badge: 'text-cyan-300' },
-  { border: 'border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.45)]', badge: 'text-fuchsia-300' },
-  { border: 'border-lime-400 shadow-[0_0_20px_rgba(163,230,53,0.45)]', badge: 'text-lime-300' },
-  { border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.45)]', badge: 'text-yellow-300' },
-  { border: 'border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.45)]', badge: 'text-orange-300' },
-  { border: 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.45)]', badge: 'text-rose-300' },
-  { border: 'border-violet-400 shadow-[0_0_20px_rgba(167,139,250,0.45)]', badge: 'text-violet-300' },
-  { border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]', badge: 'text-emerald-300' },
+export const FLASHY_BORDERS = [
+  {
+    border: 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.45)]',
+    badge: 'text-cyan-300',
+    pillBorder: 'border-cyan-400',
+    pillGlow: 'shadow-[0_0_20px_rgba(34,211,238,0.35)]',
+    rankBadge: 'bg-cyan-400/15 border-cyan-400/60 text-cyan-300',
+  },
+  {
+    border: 'border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.45)]',
+    badge: 'text-fuchsia-300',
+    pillBorder: 'border-fuchsia-500',
+    pillGlow: 'shadow-[0_0_20px_rgba(217,70,239,0.35)]',
+    rankBadge: 'bg-fuchsia-500/15 border-fuchsia-500/60 text-fuchsia-300',
+  },
+  {
+    border: 'border-lime-400 shadow-[0_0_20px_rgba(163,230,53,0.45)]',
+    badge: 'text-lime-300',
+    pillBorder: 'border-lime-400',
+    pillGlow: 'shadow-[0_0_20px_rgba(163,230,53,0.35)]',
+    rankBadge: 'bg-lime-400/15 border-lime-400/60 text-lime-300',
+  },
+  {
+    border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.45)]',
+    badge: 'text-yellow-300',
+    pillBorder: 'border-yellow-400',
+    pillGlow: 'shadow-[0_0_20px_rgba(250,204,21,0.35)]',
+    rankBadge: 'bg-yellow-400/15 border-yellow-400/60 text-yellow-300',
+  },
+  {
+    border: 'border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.45)]',
+    badge: 'text-orange-300',
+    pillBorder: 'border-orange-500',
+    pillGlow: 'shadow-[0_0_20px_rgba(249,115,22,0.35)]',
+    rankBadge: 'bg-orange-500/15 border-orange-500/60 text-orange-300',
+  },
+  {
+    border: 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.45)]',
+    badge: 'text-rose-300',
+    pillBorder: 'border-rose-500',
+    pillGlow: 'shadow-[0_0_20px_rgba(244,63,94,0.35)]',
+    rankBadge: 'bg-rose-500/15 border-rose-500/60 text-rose-300',
+  },
+  {
+    border: 'border-violet-400 shadow-[0_0_20px_rgba(167,139,250,0.45)]',
+    badge: 'text-violet-300',
+    pillBorder: 'border-violet-400',
+    pillGlow: 'shadow-[0_0_20px_rgba(167,139,250,0.35)]',
+    rankBadge: 'bg-violet-400/15 border-violet-400/60 text-violet-300',
+  },
+  {
+    border: 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]',
+    badge: 'text-emerald-300',
+    pillBorder: 'border-emerald-400',
+    pillGlow: 'shadow-[0_0_20px_rgba(52,211,153,0.35)]',
+    rankBadge: 'bg-emerald-400/15 border-emerald-400/60 text-emerald-300',
+  },
 ]
+
+export function getPlayerColorStyle(playerId: number) {
+  const safeId = Math.abs(playerId)
+  return FLASHY_BORDERS[safeId % FLASHY_BORDERS.length]
+}
 
 function shuffleQuestions(list: QuizQuestion[]): QuizQuestion[] {
   const copy = [...list]
@@ -310,7 +363,6 @@ export default function TVPage() {
     }
   }, [])
 
-  // Décompte de 3 secondes avant l'apparition de la première question
   useEffect(() => {
     if (!gameRunning || startCountdown === null || gameFinished) return
 
@@ -339,7 +391,6 @@ export default function TVPage() {
     }
   }, [gameRunning, startCountdown, gameFinished, startTimerSound])
 
-  // Chrono de la question active
   useEffect(() => {
     if (!isQuestionActive) {
       stopTimerSound()
@@ -499,11 +550,6 @@ export default function TVPage() {
   const currentQuestion = deckQuestions[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
 
-  const playerColorMap = new Map<number, (typeof FLASHY_BORDERS)[number]>()
-  playersList.forEach((p, idx) => {
-    playerColorMap.set(p.id, FLASHY_BORDERS[idx % FLASHY_BORDERS.length])
-  })
-
   const rankedPlayers = computeDenseRanks(playersList)
   const hasReachedLimit = playersList.some((p) => (p.score ?? 0) >= scoreLimit)
 
@@ -587,7 +633,6 @@ export default function TVPage() {
               )}
             </div>
 
-            {/* Choix du jeu */}
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
               <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
                 Choix du jeu
@@ -628,8 +673,8 @@ export default function TVPage() {
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-3 justify-center">
-                  {playersList.map((p, idx) => {
-                    const style = FLASHY_BORDERS[idx % FLASHY_BORDERS.length]
+                  {playersList.map((p) => {
+                    const style = getPlayerColorStyle(p.id)
                     return (
                       <span
                         key={p.id}
@@ -664,7 +709,7 @@ export default function TVPage() {
 
             <div className="space-y-4">
               {rankedPlayers.map(({ player: p, rank }) => {
-                const colorStyle = playerColorMap.get(p.id) || FLASHY_BORDERS[0]
+                const colorStyle = getPlayerColorStyle(p.id)
                 return (
                   <div
                     key={p.id}
@@ -696,7 +741,6 @@ export default function TVPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 relative">
-            {/* Décompte géant de 3 secondes au milieu de l'écran */}
             {startCountdown !== null && (
               <div className="fixed inset-0 z-50 bg-slate-950/90 flex flex-col items-center justify-center pointer-events-none select-none">
                 <span
@@ -847,7 +891,7 @@ export default function TVPage() {
 
               <div className="space-y-4">
                 {rankedPlayers.map(({ player: p, rank }) => {
-                  const colorStyle = playerColorMap.get(p.id) || FLASHY_BORDERS[0]
+                  const colorStyle = getPlayerColorStyle(p.id)
                   const answerBubbleStyle =
                     p.answer && ANSWER_BUBBLE_STYLES[p.answer]
                       ? ANSWER_BUBBLE_STYLES[p.answer]
