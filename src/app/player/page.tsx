@@ -6,7 +6,7 @@ import { Suspense, useEffect, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Viewport } from 'next'
 import { supabase } from '@/lib/supabase'
-import { getPlayerColorStyle } from '@/lib/playerColors'
+import { getPlayerColorTheme, getPlayerNeonStyle } from '@/lib/playerColors'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -489,7 +489,7 @@ function PlayerContent() {
 
   const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
   const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
-  const pillStyle = getPlayerColorStyle(playerId ?? 0)
+  const theme = getPlayerColorTheme(playerId ?? 0)
 
   return (
     <main
@@ -556,14 +556,16 @@ function PlayerContent() {
           </button>
         </form>
       ) : (
-        <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4">
-          {/* Pastille joueur positionnée sous la Dynamic Island avec la même couleur et le même halo que sur la TV */}
+        <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4 overflow-visible">
+          {/* Pastille joueur sous la Dynamic Island avec halo néon identique à la TV */}
           <div
-            className={`bg-slate-900 border-4 ${pillStyle.pillBorder} ${pillStyle.pillGlow} ${pillStyle.halo} px-4 py-3 rounded-3xl flex items-center justify-between gap-3`}
+            style={getPlayerNeonStyle(playerId ?? 0)}
+            className="bg-slate-900/90 border-4 px-4 py-3 rounded-3xl flex items-center justify-between gap-3"
           >
             <div className="flex items-center gap-3 min-w-0">
               <span
-                className={`px-3 py-1 rounded-2xl border-2 text-xl font-black shrink-0 ${pillStyle.rankBadge}`}
+                style={{ borderColor: theme.hex }}
+                className={`px-3 py-1 rounded-2xl border-2 text-xl font-black shrink-0 ${theme.rankBadgeClass}`}
               >
                 #{rank}
               </span>
