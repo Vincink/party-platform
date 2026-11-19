@@ -609,7 +609,7 @@ export default function TVPage() {
                   En attente des joueurs sur leur smartphone...
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-3 justify-center">
+                <div className="flex flex-wrap gap-4 justify-center">
                   {playersList.map((p) => {
                     const style = getPlayerColorStyle(p.id)
                     return (
