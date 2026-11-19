@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { QUESTIONS } from '@/data/questions'
 
@@ -12,6 +12,8 @@ interface Player {
   answer?: string | null
   score?: number | null
 }
+
+const QUESTION_DURATION = 15
 
 const OPTION_STYLES: Record<string, string> = {
   A: 'bg-rose-600/90 border-rose-400',
@@ -59,9 +61,59 @@ export default function TVPage() {
   const [questionIndex, setQuestionIndex] = useState<number>(0)
   const [revealAnswers, setRevealAnswers] = useState<boolean>(false)
   const [scoredQuestionIndex, setScoredQuestionIndex] = useState<number | null>(null)
+  const [timeLeft, setTimeLeft] = useState<number>(QUESTION_DURATION)
 
   const initialized = useRef(false)
   const pinRef = useRef<string>('')
+  const playersListRef = useRef<Player[]>([])
+  const questionIndexRef = useRef<number>(0)
+  const scoredQuestionIndexRef = useRef<number | null>(null)
+  const isRevealingRef = useRef<boolean>(false)
+
+  useEffect(() => {
+    playersListRef.current = playersList
+  }, [playersList])
+
+  useEffect(() => {
+    questionIndexRef.current = questionIndex
+  }, [questionIndex])
+
+  useEffect(() => {
+    scoredQuestionIndexRef.current = scoredQuestionIndex
+  }, [scoredQuestionIndex])
+
+  const triggerRevealAndScore = useCallback(async () => {
+    if (isRevealingRef.current) return
+    isRevealingRef.current = true
+
+    const idx = questionIndexRef.current
+    const currentQuestion = QUESTIONS[idx]
+    const currentPlayers = playersListRef.current
+
+    if (scoredQuestionIndexRef.current !== idx && currentQuestion) {
+      scoredQuestionIndexRef.current = idx
+      setScoredQuestionIndex(idx)
+
+      const updatedList = await Promise.all(
+        currentPlayers.map(async (p) => {
+          if (p.answer === currentQuestion.correct) {
+            const nextScore = (p.score ?? 0) + 10
+            await supabase
+              .from('players')
+              .update({ score: nextScore })
+              .eq('id', p.id)
+            return { ...p, score: nextScore }
+          }
+          return p
+        })
+      )
+
+      setPlayersList(updatedList)
+    }
+
+    setRevealAnswers(true)
+    isRevealingRef.current = false
+  }, [])
 
   useEffect(() => {
     if (initialized.current) return
@@ -132,6 +184,26 @@ export default function TVPage() {
     }
   }, [])
 
+  // Compte à rebours de 15 secondes pendant une question non révélée
+  useEffect(() => {
+    if (!gameStarted || revealAnswers) return
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer)
+          void triggerRevealAndScore()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [gameStarted, revealAnswers, questionIndex, triggerRevealAndScore])
+
   async function startGame() {
     const currentPin = pin || pinRef.current
     const { error } = await supabase
@@ -147,38 +219,23 @@ export default function TVPage() {
       setQuestionIndex(0)
       setRevealAnswers(false)
       setScoredQuestionIndex(null)
+      scoredQuestionIndexRef.current = null
+      setTimeLeft(QUESTION_DURATION)
     }
   }
 
   async function toggleRevealAnswers() {
-    const currentQuestion = QUESTIONS[questionIndex]
-
-    if (!revealAnswers && scoredQuestionIndex !== questionIndex) {
-      setScoredQuestionIndex(questionIndex)
-
-      const updatedList = await Promise.all(
-        playersList.map(async (p) => {
-          if (p.answer === currentQuestion.correct) {
-            const nextScore = (p.score ?? 0) + 10
-            await supabase
-              .from('players')
-              .update({ score: nextScore })
-              .eq('id', p.id)
-            return { ...p, score: nextScore }
-          }
-          return p
-        })
-      )
-
-      setPlayersList(updatedList)
+    if (!revealAnswers) {
+      await triggerRevealAndScore()
+    } else {
+      setRevealAnswers(false)
     }
-
-    setRevealAnswers((prev) => !prev)
   }
 
   async function nextQuestion() {
     const currentPin = pin || pinRef.current
     setRevealAnswers(false)
+    setTimeLeft(QUESTION_DURATION)
 
     await supabase
       .from('players')
@@ -293,9 +350,24 @@ export default function TVPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1">
             <div className="lg:col-span-7 space-y-6">
               <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center">
-                <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
-                  Question {questionIndex + 1} / {QUESTIONS.length}
-                </p>
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                    Question {questionIndex + 1} / {QUESTIONS.length}
+                  </p>
+
+                  <div
+                    className={`px-4 py-1.5 rounded-full font-black text-2xl tabular-nums border-2 transition-all ${
+                      revealAnswers
+                        ? 'bg-slate-800 border-slate-700 text-slate-400'
+                        : timeLeft <= 5
+                        ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.75)]'
+                        : 'bg-indigo-600/30 border-indigo-400 text-indigo-200'
+                    }`}
+                  >
+                    {revealAnswers ? 'Temps écoulé' : `${timeLeft}s`}
+                  </div>
+                </div>
+
                 <h1 className="text-3xl md:text-4xl font-black leading-tight">
                   {currentQuestion.question}
                 </h1>
@@ -304,17 +376,35 @@ export default function TVPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                 {(['A', 'B', 'C', 'D'] as const).map((key) => {
                   const isCorrect = revealAnswers && currentQuestion.correct === key
+                  const isDimmed = revealAnswers && currentQuestion.correct !== key
+
                   return (
                     <div
                       key={key}
-                      className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+                      className={`p-5 rounded-2xl border-2 flex items-center justify-between gap-3 transition-all duration-300 ${
                         OPTION_STYLES[key]
-                      } ${isCorrect ? 'ring-4 ring-white scale-[1.02]' : ''}`}
+                      } ${
+                        isCorrect
+                          ? 'ring-4 ring-white scale-[1.04] brightness-110 shadow-[0_0_35px_rgba(255,255,255,0.45)] z-10'
+                          : isDimmed
+                          ? 'opacity-30 scale-[0.98] grayscale-[30%]'
+                          : ''
+                      }`}
                     >
-                      <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
-                        {key}
-                      </span>
-                      <span className="text-2xl font-bold">{currentQuestion.options[key]}</span>
+                      <div className="flex items-center gap-4 min-w-0">
+                        <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
+                          {key}
+                        </span>
+                        <span className="text-2xl font-bold leading-snug">
+                          {currentQuestion.options[key]}
+                        </span>
+                      </div>
+
+                      {isCorrect && (
+                        <span className="px-3 py-1 rounded-full bg-white text-slate-950 font-black text-xs uppercase tracking-wider shrink-0 shadow">
+                          ✓ Bonne réponse
+                        </span>
+                      )}
                     </div>
                   )
                 })}
