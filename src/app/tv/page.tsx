@@ -22,6 +22,7 @@ const QUESTION_DURATION = 15
 const CORRECT_POINTS = 10
 const WRONG_ANSWER_PENALTY = 5
 const SCORE_LIMIT_OPTIONS = [100, 150, 200] as const
+const TIMER_SOUND_SRC = '/quiz_son.mp3'
 
 const OPTION_STYLES: Record<string, string> = {
   A: 'bg-rose-600/90 border-rose-400',
@@ -94,6 +95,7 @@ export default function TVPage() {
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
   const [scoreLimit, setScoreLimit] = useState<number>(100)
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true)
   const [gameStarted, setGameStarted] = useState<boolean>(false)
   const [gameFinished, setGameFinished] = useState<boolean>(false)
   const [deckQuestions, setDeckQuestions] = useState<QuizQuestion[]>(QUESTIONS)
@@ -109,6 +111,7 @@ export default function TVPage() {
   const questionIndexRef = useRef<number>(0)
   const scoredQuestionIndexRef = useRef<number | null>(null)
   const isRevealingRef = useRef<boolean>(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     playersListRef.current = playersList
@@ -126,9 +129,49 @@ export default function TVPage() {
     scoredQuestionIndexRef.current = scoredQuestionIndex
   }, [scoredQuestionIndex])
 
+  const stopTimerSound = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.pause()
+    audio.currentTime = 0
+  }, [])
+
+  const startTimerSound = useCallback(() => {
+    if (!soundEnabled || typeof window === 'undefined') return
+    if (!audioRef.current) {
+      const audio = new Audio(TIMER_SOUND_SRC)
+      audio.loop = true
+      audio.volume = 1
+      audioRef.current = audio
+    }
+    const audio = audioRef.current
+    audio.currentTime = 0
+    void audio.play().catch(() => {
+      // Lecture bloquée tant qu'aucune interaction utilisateur n'a eu lieu
+    })
+  }, [soundEnabled])
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!soundEnabled) {
+      stopTimerSound()
+    } else if (gameStarted && !gameFinished && !revealAnswers) {
+      startTimerSound()
+    }
+  }, [soundEnabled, gameStarted, gameFinished, revealAnswers, stopTimerSound, startTimerSound])
+
   const triggerRevealAndScore = useCallback(async () => {
     if (isRevealingRef.current) return
     isRevealingRef.current = true
+    stopTimerSound()
 
     const idx = questionIndexRef.current
     const currentQuestion = deckQuestionsRef.current[idx]
@@ -169,7 +212,7 @@ export default function TVPage() {
 
     setRevealAnswers(true)
     isRevealingRef.current = false
-  }, [])
+  }, [stopTimerSound])
 
   useEffect(() => {
     if (initialized.current) return
@@ -240,9 +283,14 @@ export default function TVPage() {
     }
   }, [])
 
-  // Compte à rebours de 15 secondes pendant une question non révélée
+  // Compte à rebours de 15 secondes
   useEffect(() => {
-    if (!gameStarted || gameFinished || revealAnswers) return
+    if (!gameStarted || gameFinished || revealAnswers) {
+      stopTimerSound()
+      return
+    }
+
+    startTimerSound()
 
     const timer = window.setInterval(() => {
       setTimeLeft((prev) => {
@@ -257,8 +305,9 @@ export default function TVPage() {
 
     return () => {
       window.clearInterval(timer)
+      stopTimerSound()
     }
-  }, [gameStarted, gameFinished, revealAnswers, questionIndex, triggerRevealAndScore])
+  }, [gameStarted, gameFinished, revealAnswers, questionIndex, triggerRevealAndScore, startTimerSound, stopTimerSound])
 
   async function startGame() {
     const currentPin = pin || pinRef.current
@@ -281,10 +330,12 @@ export default function TVPage() {
       setScoredQuestionIndex(null)
       scoredQuestionIndexRef.current = null
       setTimeLeft(QUESTION_DURATION)
+      startTimerSound()
     }
   }
 
   async function nextQuestion() {
+    stopTimerSound()
     const currentPin = pin || pinRef.current
     setRevealAnswers(false)
     setTimeLeft(QUESTION_DURATION)
@@ -304,6 +355,7 @@ export default function TVPage() {
   }
 
   async function replayGame() {
+    stopTimerSound()
     const currentPin = pin || pinRef.current
 
     await supabase
@@ -344,16 +396,29 @@ export default function TVPage() {
     <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white">
       <div className="max-w-7xl w-full mx-auto space-y-6 flex-1 flex flex-col">
         {/* Barre supérieure */}
-        <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl">
+        <div className="flex items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl">
           <span className="text-sm font-bold uppercase tracking-widest text-slate-400">
             Salon Animateur
           </span>
           <span className="text-xl font-black tracking-widest text-indigo-400">
             PIN : {pin || '----'}
           </span>
-          <span className="text-sm font-semibold text-slate-300">
-            +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts • Objectif : {scoreLimit} pts
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-sm font-semibold text-slate-300">
+              +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts • Objectif : {scoreLimit} pts
+            </span>
+            <button
+              type="button"
+              onClick={() => setSoundEnabled((prev) => !prev)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                soundEnabled
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400'
+              }`}
+            >
+              {soundEnabled ? '🔊 Son ON' : '🔇 Son OFF'}
+            </button>
+          </div>
         </div>
 
         {dbError && (
