@@ -16,6 +16,7 @@ export default function PlayerPage() {
   const [roomCode, setRoomCode] = useState('')
   const [pseudo, setPseudo] = useState('')
   const [playerId, setPlayerId] = useState<number | null>(null)
+  const [score, setScore] = useState<number>(0)
   const [joined, setJoined] = useState(false)
   const [gameStarted, setGameStarted] = useState(false)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
@@ -47,29 +48,29 @@ export default function PlayerPage() {
 
     const { data: player, error: playerError } = await supabase
       .from('players')
-      .insert([{ room_code: cleanCode, session_id: cleanCode, pseudo: cleanPseudo }])
+      .insert([{ room_code: cleanCode, session_id: cleanCode, pseudo: cleanPseudo, score: 0 }])
       .select()
       .single()
 
-        if (playerError || !player) {
+    if (playerError || !player) {
       setErrorMsg(playerError?.message || 'Erreur inconnue')
       return
     }
 
-
     setPlayerId(player.id)
+    setScore(player.score ?? 0)
     setJoined(true)
     if (room.status === 'playing') {
       setGameStarted(true)
     }
   }
 
-  // Écouter l'état de la partie en temps réel
+  // Écouter l'état de la partie et les mises à jour du joueur (dont le score)
   useEffect(() => {
-    if (!joined || !roomCode) return
+    if (!joined || !roomCode || !playerId) return
 
     const channel = supabase
-      .channel('player-room-' + roomCode)
+      .channel('player-room-' + roomCode + '-' + playerId)
       .on(
         'postgres_changes',
         {
@@ -85,12 +86,26 @@ export default function PlayerPage() {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'players',
+          filter: `id=eq.${playerId}`,
+        },
+        (payload) => {
+          if (typeof payload.new.score === 'number') {
+            setScore(payload.new.score)
+          }
+        }
+      )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [joined, roomCode])
+  }, [joined, roomCode, playerId])
 
   // Envoyer la réponse (A, B, C ou D)
   async function sendAnswer(choiceKey: string) {
@@ -161,12 +176,23 @@ export default function PlayerPage() {
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-3xl text-center space-y-4">
           <p className="text-sm uppercase tracking-widest text-indigo-400 font-bold">Connecté • Salon {roomCode}</p>
           <h2 className="text-3xl font-black">{pseudo}</h2>
+          <p className="text-emerald-400 font-bold text-lg">{score} pts</p>
           <p className="text-slate-400 animate-pulse">En attente du lancement par l'animateur...</p>
         </div>
       ) : (
         <div className="w-full max-w-md space-y-5">
-          <div className="text-center space-y-1">
-            <p className="text-xs uppercase tracking-widest text-slate-400">Joueur : {pseudo}</p>
+          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-5 py-3 rounded-2xl">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-slate-400">Joueur</p>
+              <p className="font-bold text-base">{pseudo}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400">Score</p>
+              <p className="font-black text-xl text-emerald-400">{score} pts</p>
+            </div>
+          </div>
+
+          <div className="text-center">
             <h2 className="text-2xl font-black">Choisis ta réponse !</h2>
           </div>
 
