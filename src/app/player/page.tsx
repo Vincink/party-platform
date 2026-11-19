@@ -12,7 +12,22 @@ const CHOICES = [
   { key: 'D', label: 'D', color: 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400' },
 ]
 
+function getOrCreateClientId(): string {
+  if (typeof window === 'undefined') return ''
+  const key = 'quiz_client_id'
+  let id = window.localStorage.getItem(key)
+  if (!id) {
+    id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    window.localStorage.setItem(key, id)
+  }
+  return id
+}
+
 export default function PlayerPage() {
+  const [clientId, setClientId] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [pseudo, setPseudo] = useState('')
   const [playerId, setPlayerId] = useState<number | null>(null)
@@ -22,7 +37,11 @@ export default function PlayerPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Rejoindre le salon
+  useEffect(() => {
+    setClientId(getOrCreateClientId())
+  }, [])
+
+  // Rejoindre ou reprendre la session de ce smartphone
   async function joinRoom(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg('')
@@ -35,6 +54,8 @@ export default function PlayerPage() {
       return
     }
 
+    const activeClientId = clientId || getOrCreateClientId()
+
     const { data: room, error: roomError } = await supabase
       .from('rooms')
       .select('room_code, status')
@@ -46,9 +67,53 @@ export default function PlayerPage() {
       return
     }
 
+    // 1. Vérifie si CE smartphone a déjà une ligne dans ce salon
+    const { data: existingDevicePlayer, error: findError } = await supabase
+      .from('players')
+      .select('id, pseudo, score, answer')
+      .eq('session_id', cleanCode)
+      .eq('client_id', activeClientId)
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (findError) {
+      setErrorMsg(findError.message)
+      return
+    }
+
+    if (existingDevicePlayer) {
+      // Si l'utilisateur a changé de pseudo sur le même téléphone, on met à jour son pseudo
+      if (existingDevicePlayer.pseudo !== cleanPseudo) {
+        await supabase
+          .from('players')
+          .update({ pseudo: cleanPseudo })
+          .eq('id', existingDevicePlayer.id)
+      }
+
+      setPlayerId(existingDevicePlayer.id)
+      setPseudo(cleanPseudo)
+      setScore(existingDevicePlayer.score ?? 0)
+      setSelectedAnswer(existingDevicePlayer.answer ?? null)
+      setJoined(true)
+      if (room.status === 'playing') {
+        setGameStarted(true)
+      }
+      return
+    }
+
+    // 2. Sinon, c'est un nouveau joueur (même si un autre smartphone a déjà pris ce prénom)
     const { data: player, error: playerError } = await supabase
       .from('players')
-      .insert([{ room_code: cleanCode, session_id: cleanCode, pseudo: cleanPseudo, score: 0 }])
+      .insert([
+        {
+          room_code: cleanCode,
+          session_id: cleanCode,
+          client_id: activeClientId,
+          pseudo: cleanPseudo,
+          score: 0,
+        },
+      ])
       .select()
       .single()
 
@@ -59,6 +124,7 @@ export default function PlayerPage() {
 
     setPlayerId(player.id)
     setScore(player.score ?? 0)
+    setSelectedAnswer(null)
     setJoined(true)
     if (room.status === 'playing') {
       setGameStarted(true)
@@ -97,6 +163,9 @@ export default function PlayerPage() {
         (payload) => {
           if (typeof payload.new.score === 'number') {
             setScore(payload.new.score)
+          }
+          if ('answer' in payload.new && payload.new.answer === null) {
+            setSelectedAnswer(null)
           }
         }
       )
