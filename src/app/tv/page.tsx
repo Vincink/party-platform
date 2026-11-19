@@ -615,7 +615,7 @@ export default function TVPage() {
                     return (
                       <span
                         key={p.id}
-                        className={`px-5 py-2.5 bg-slate-900 border-4 ${style.border} rounded-full font-bold text-xl`}
+                        className={`px-5 py-2.5 bg-slate-900 ${style.pillBg} border-4 ${style.border} rounded-full font-bold text-xl`}
                       >
                         {getDisplayName(p, playersList)}
                       </span>
@@ -650,7 +650,7 @@ export default function TVPage() {
                 return (
                   <div
                     key={p.id}
-                    className={`bg-slate-950 border-4 ${colorStyle.border} rounded-3xl px-6 py-4 flex items-center justify-between gap-4`}
+                    className={`bg-slate-950 ${colorStyle.pillBg} border-4 ${colorStyle.border} rounded-3xl px-6 py-4 flex items-center justify-between gap-4`}
                   >
                     <div className="flex items-center gap-4 min-w-0">
                       <span className={`text-3xl font-black shrink-0 ${colorStyle.badge}`}>
@@ -837,7 +837,7 @@ export default function TVPage() {
                   return (
                     <div
                       key={p.id}
-                      className={`bg-slate-900 border-4 ${colorStyle.border} rounded-3xl px-6 py-4 flex items-center justify-between gap-4 transition-all`}
+                      className={`bg-slate-900 ${colorStyle.pillBg} border-4 ${colorStyle.border} rounded-3xl px-6 py-4 flex items-center justify-between gap-4 transition-all`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className={`text-2xl font-black shrink-0 ${colorStyle.badge}`}>
