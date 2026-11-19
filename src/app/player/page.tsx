@@ -112,7 +112,7 @@ function PlayerContent() {
     }
   }, [initialPin, pin])
 
-  // Blocage strict du scroll, du pincement et du double-tap zoom sur iOS
+  // Blocage du scroll, du pincement et du double-tap zoom sur iOS
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -283,10 +283,6 @@ function PlayerContent() {
     }
     void syncRoom()
 
-    const pollInterval = window.setInterval(() => {
-      void syncRoom()
-    }, 1500)
-
     const channel = supabase
       .channel('player-room-' + pin + '-' + (playerId ?? 'anon'))
       .on(
@@ -310,7 +306,6 @@ function PlayerContent() {
       .subscribe()
 
     return () => {
-      window.clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
   }, [joined, pin, playerId, applyRoomStatus, refreshRank])
@@ -478,7 +473,6 @@ function PlayerContent() {
       .from('players')
       .update({ answer: choice })
       .eq('id', playerId)
-      .is('answer', null)
 
     submittingAnswerRef.current = false
     if (error) {
@@ -594,11 +588,13 @@ function PlayerContent() {
                     className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all touch-manipulation ${
                       item.style
                     } ${
+                      isLocked ? 'pointer-events-none cursor-default' : 'active:scale-95'
+                    } ${
                       isSelected
                         ? 'ring-4 ring-white scale-[0.98] brightness-110'
                         : dimOther
                         ? 'opacity-35 scale-[0.96]'
-                        : 'active:scale-95'
+                        : ''
                     }`}
                   >
                     {item.label}
@@ -610,7 +606,7 @@ function PlayerContent() {
 
           {/* Message d'état discret en bas */}
           <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center">
-            {roomStatus === 'waiting' && (
+            {roomStatus === 'waiting' && !selectedAnswer && (
               <p className="text-sm font-bold text-slate-300">
                 En attente du lancement sur la TV...
               </p>
@@ -635,11 +631,14 @@ function PlayerContent() {
                 Réponse révélée sur la TV
               </p>
             )}
-            {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
+            {!isRevealed && roomStatus !== 'finished' && selectedAnswer && (
               <p className="text-sm font-bold text-indigo-300">
-                {selectedAnswer
-                  ? `Choix ${selectedAnswer} verrouillé`
-                  : 'Choisis A, B, C ou D avant la fin du chrono'}
+                Réponse {selectedAnswer} envoyée à la TV
+              </p>
+            )}
+            {!isRevealed && roomStatus !== 'waiting' && roomStatus !== 'finished' && !selectedAnswer && (
+              <p className="text-sm font-bold text-indigo-300">
+                Choisis A, B, C ou D avant la fin du chrono
               </p>
             )}
           </div>
