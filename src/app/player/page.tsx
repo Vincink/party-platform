@@ -112,11 +112,12 @@ function PlayerContent() {
     }
   }, [initialPin, pin])
 
+  // Empêche le pincement/zoom multi-doigts sans bloquer les appuis simples
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const preventTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 1 || e.cancelable) {
+    const preventPinchMove = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
         e.preventDefault()
       }
     }
@@ -125,12 +126,12 @@ function PlayerContent() {
       e.preventDefault()
     }
 
-    document.addEventListener('touchmove', preventTouchMove, { passive: false })
+    document.addEventListener('touchmove', preventPinchMove, { passive: false })
     document.addEventListener('gesturestart', preventGesture, { passive: false })
     document.addEventListener('gesturechange', preventGesture, { passive: false })
 
     return () => {
-      document.removeEventListener('touchmove', preventTouchMove)
+      document.removeEventListener('touchmove', preventPinchMove)
       document.removeEventListener('gesturestart', preventGesture)
       document.removeEventListener('gesturechange', preventGesture)
     }
@@ -193,25 +194,54 @@ function PlayerContent() {
     }
   }, [])
 
+  const applyRoomStatus = useCallback(
+    (nextStatus: string, roomPin: string, currentPlayerId: number | null) => {
+      setRoomStatus(nextStatus)
+
+      if (nextStatus.startsWith('playing')) {
+        setSelectedAnswer(null)
+        setLastOutcome(null)
+      } else if (nextStatus === 'waiting') {
+        setSelectedAnswer(null)
+        setLastOutcome(null)
+      } else if (nextStatus.startsWith('revealed:')) {
+        void refreshRank(roomPin, currentPlayerId)
+        const parts = nextStatus.split(':')
+        const correctLetter = (parts[2] || '') as ChoiceKey | ''
+        const chosen = selectedAnswerRef.current
+
+        if (chosen && correctLetter) {
+          setLastOutcome(chosen === correctLetter ? 'correct' : 'wrong')
+        }
+      }
+    },
+    [refreshRank]
+  )
+
+  // Écoute des changements de statut du salon + secours périodique
   useEffect(() => {
     if (!joined || !pin) return
 
-    async function syncInitialRoom() {
+    async function syncRoom() {
       const { data } = await supabase
         .from('rooms')
         .select('status, game_type')
         .eq('room_code', pin)
         .maybeSingle()
 
-      if (data?.status) {
-        setRoomStatus(data.status)
-      }
       if (data?.game_type === 'quiz') {
         setGameType('quiz')
       }
+      if (data?.status) {
+        applyRoomStatus(String(data.status), pin, playerId)
+      }
       await refreshRank(pin, playerId)
     }
-    void syncInitialRoom()
+    void syncRoom()
+
+    const pollInterval = window.setInterval(() => {
+      void syncRoom()
+    }, 1500)
 
     const channel = supabase
       .channel('player-room-' + pin + '-' + (playerId ?? 'anon'))
@@ -228,37 +258,20 @@ function PlayerContent() {
           if (row?.game_type === 'quiz') {
             setGameType('quiz')
           }
-
-          const nextStatus = String(row?.status || '')
-          setRoomStatus(nextStatus)
-
-          if (nextStatus.startsWith('playing')) {
-            setSelectedAnswer(null)
-            setLastOutcome(null)
-          } else if (nextStatus === 'waiting') {
-            setSelectedAnswer(null)
-            setLastOutcome(null)
-            setScore(0)
-            setRank(1)
-          } else if (nextStatus.startsWith('revealed:')) {
-            void refreshRank(pin, playerId)
-            const parts = nextStatus.split(':')
-            const correctLetter = (parts[2] || '') as ChoiceKey | ''
-            const chosen = selectedAnswerRef.current
-
-            if (chosen && correctLetter) {
-              setLastOutcome(chosen === correctLetter ? 'correct' : 'wrong')
-            }
+          if (row?.status) {
+            applyRoomStatus(String(row.status), pin, playerId)
           }
         }
       )
       .subscribe()
 
     return () => {
+      window.clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
-  }, [joined, pin, playerId, refreshRank])
+  }, [joined, pin, playerId, applyRoomStatus, refreshRank])
 
+  // Écoute des mises à jour des scores dans la room (rang + état validation/erreur)
   useEffect(() => {
     if (!joined || !pin || !playerId) return
 
@@ -409,11 +422,10 @@ function PlayerContent() {
   }
 
   const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
-  const isLocked =
-    Boolean(selectedAnswer) || isRevealed || roomStatus === 'waiting' || roomStatus === 'finished'
+  const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
 
   return (
-    <main className="h-dvh w-screen overflow-hidden overscroll-none select-none touch-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5">
+    <main className="h-dvh w-screen overflow-hidden overscroll-none select-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5">
       {!joined ? (
         <form
           onSubmit={handleJoin}
@@ -465,7 +477,7 @@ function PlayerContent() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xl transition-colors"
+            className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xl transition-colors touch-manipulation"
           >
             {loading ? 'Connexion...' : '🎮 Entrer dans le salon'}
           </button>
@@ -507,7 +519,7 @@ function PlayerContent() {
                     type="button"
                     disabled={isLocked}
                     onClick={() => void handleSelectAnswer(item.key)}
-                    className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all ${
+                    className={`h-28 sm:h-32 rounded-3xl border-4 flex items-center justify-center text-4xl sm:text-5xl font-black transition-all touch-manipulation ${
                       item.style
                     } ${
                       isSelected
