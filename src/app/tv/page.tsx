@@ -32,7 +32,7 @@ const GAME_OPTIONS: {
   {
     id: 'quiz',
     title: 'Quiz',
-    subtitle: '4 choix • +10 / -5 pts',
+    subtitle: '15 questions • +10 / -5 / -2 pts',
     icon: '🧠',
   },
 ]
@@ -59,9 +59,10 @@ const THEME_OPTIONS: {
 
 const START_COUNTDOWN_SECONDS = 3
 const QUESTION_DURATION = 15
+const QUESTIONS_PER_GAME = 15
 const CORRECT_POINTS = 10
 const WRONG_ANSWER_PENALTY = 5
-const DEFAULT_SCORE_LIMIT = 100
+const NO_ANSWER_PENALTY = 2
 const TIMER_SOUND_SRC = '/quiz_son.mp3'
 
 const OPTION_STYLES: Record<string, string> = {
@@ -89,6 +90,10 @@ function shuffleQuestions(list: QuizQuestion[]): QuizQuestion[] {
     ;[copy[i], copy[j]] = [copy[j], copy[i]]
   }
   return copy
+}
+
+function pickRandomQuestions(theme: QuizTheme): QuizQuestion[] {
+  return shuffleQuestions(getQuestionsForTheme(theme)).slice(0, QUESTIONS_PER_GAME)
 }
 
 function getDisplayName(player: Player, allPlayers: Player[]) {
@@ -127,13 +132,14 @@ export default function TVPage() {
   const [selectedTheme, setSelectedTheme] = useState<QuizTheme>('culture')
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
-  const [scoreLimit] = useState<number>(DEFAULT_SCORE_LIMIT)
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true)
   const [gameOpened, setGameOpened] = useState<boolean>(false)
   const [gameRunning, setGameRunning] = useState<boolean>(false)
   const [startCountdown, setStartCountdown] = useState<number | null>(null)
   const [gameFinished, setGameFinished] = useState<boolean>(false)
-  const [deckQuestions, setDeckQuestions] = useState<QuizQuestion[]>(QUESTIONS)
+  const [deckQuestions, setDeckQuestions] = useState<QuizQuestion[]>(() =>
+    pickRandomQuestions('culture')
+  )
   const [questionIndex, setQuestionIndex] = useState<number>(0)
   const [revealAnswers, setRevealAnswers] = useState<boolean>(false)
   const [scoredQuestionIndex, setScoredQuestionIndex] = useState<number | null>(null)
@@ -143,7 +149,7 @@ export default function TVPage() {
   const pinRef = useRef<string>('')
   const selectedThemeRef = useRef<QuizTheme>('culture')
   const playersListRef = useRef<Player[]>([])
-  const deckQuestionsRef = useRef<QuizQuestion[]>(QUESTIONS)
+  const deckQuestionsRef = useRef<QuizQuestion[]>(deckQuestions)
   const questionIndexRef = useRef<number>(0)
   const scoredQuestionIndexRef = useRef<number | null>(null)
   const isRevealingRef = useRef<boolean>(false)
@@ -245,7 +251,12 @@ export default function TVPage() {
             return { ...p, score: nextScore }
           }
 
-          return p
+          const nextScore = Math.max(0, currentScore - NO_ANSWER_PENALTY)
+          await supabase
+            .from('players')
+            .update({ score: nextScore })
+            .eq('id', p.id)
+          return { ...p, score: nextScore }
         })
       )
 
@@ -392,16 +403,16 @@ export default function TVPage() {
   function handleSelectTheme(theme: QuizTheme) {
     selectedThemeRef.current = theme
     setSelectedTheme(theme)
-    const shuffled = shuffleQuestions(getQuestionsForTheme(theme))
-    deckQuestionsRef.current = shuffled
-    setDeckQuestions(shuffled)
+    const picked = pickRandomQuestions(theme)
+    deckQuestionsRef.current = picked
+    setDeckQuestions(picked)
   }
 
   function openGame() {
     stopTimerSound()
-    const shuffled = shuffleQuestions(getQuestionsForTheme(selectedThemeRef.current))
-    deckQuestionsRef.current = shuffled
-    setDeckQuestions(shuffled)
+    const picked = pickRandomQuestions(selectedThemeRef.current)
+    deckQuestionsRef.current = picked
+    setDeckQuestions(picked)
     setGameOpened(true)
     setGameRunning(false)
     setStartCountdown(null)
@@ -444,9 +455,9 @@ export default function TVPage() {
   async function startGame() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
-    const shuffled = shuffleQuestions(getQuestionsForTheme(selectedThemeRef.current))
-    deckQuestionsRef.current = shuffled
-    setDeckQuestions(shuffled)
+    const picked = pickRandomQuestions(selectedThemeRef.current)
+    deckQuestionsRef.current = picked
+    setDeckQuestions(picked)
     setQuestionIndex(0)
     setRevealAnswers(false)
     setScoredQuestionIndex(null)
@@ -489,7 +500,7 @@ export default function TVPage() {
   async function nextQuestion() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
-    const nextIdx = (questionIndexRef.current + 1) % deckQuestionsRef.current.length
+    const nextIdx = Math.min(questionIndexRef.current + 1, deckQuestionsRef.current.length - 1)
     setRevealAnswers(false)
     setTimeLeft(QUESTION_DURATION)
 
@@ -535,9 +546,9 @@ export default function TVPage() {
       .update({ status: 'waiting' })
       .eq('room_code', currentPin)
 
-    const shuffled = shuffleQuestions(getQuestionsForTheme(selectedThemeRef.current))
-    deckQuestionsRef.current = shuffled
-    setDeckQuestions(shuffled)
+    const picked = pickRandomQuestions(selectedThemeRef.current)
+    deckQuestionsRef.current = picked
+    setDeckQuestions(picked)
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
     setGameFinished(false)
     setGameOpened(false)
@@ -558,11 +569,18 @@ export default function TVPage() {
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
 
   const rankedPlayers = computeDenseRanks(playersList)
-  const hasReachedLimit = playersList.some((p) => (p.score ?? 0) >= scoreLimit)
+  const isLastQuestion = questionIndex >= deckQuestions.length - 1
 
   return (
-    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-x-visible">
+    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-hidden select-none">
       <style>{`
+        html, body {
+          overflow: hidden;
+          overscroll-behavior: none;
+          touch-action: none;
+          -webkit-user-select: none;
+          user-select: none;
+        }
         @keyframes slideLeftFade {
           0% {
             opacity: 0;
@@ -589,9 +607,6 @@ export default function TVPage() {
             PIN : {pin || '----'}
           </span>
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-sm font-semibold text-slate-300">
-              +{CORRECT_POINTS} / -{WRONG_ANSWER_PENALTY} pts • Objectif : {scoreLimit} pts
-            </span>
             <button
               type="button"
               onClick={() => setSoundEnabled((prev) => !prev)}
@@ -707,7 +722,7 @@ export default function TVPage() {
           <div className="max-w-3xl w-full mx-auto my-auto bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-6">
             <div className="text-center space-y-2">
               <p className="text-xs uppercase tracking-widest text-amber-400 font-bold">
-                Objectif {scoreLimit} pts atteint
+                Fin de la partie ({deckQuestions.length} questions)
               </p>
               <h1 className="text-4xl md:text-5xl font-black">Classement final</h1>
             </div>
@@ -801,7 +816,7 @@ export default function TVPage() {
                   </div>
 
                   <p className="text-slate-400 text-base">
-                    Thème sélectionné : <span className="text-white font-bold">{activeThemeOption.title}</span> — clique sur « Démarrer le jeu » pour lancer le décompte de 3 secondes.
+                    Thème sélectionné : <span className="text-white font-bold">{activeThemeOption.title}</span> — {QUESTIONS_PER_GAME} questions aléatoires, victoire au plus de points.
                   </p>
                 </div>
               ) : (
@@ -910,7 +925,7 @@ export default function TVPage() {
                 </div>
 
                 {gameRunning && startCountdown === null && (
-                  revealAnswers && hasReachedLimit ? (
+                  revealAnswers && isLastQuestion ? (
                     <button
                       type="button"
                       onClick={() => void finishGame()}
