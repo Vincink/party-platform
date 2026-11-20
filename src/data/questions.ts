@@ -1005,4 +1005,501 @@ export const QUESTIONS: QuizQuestion[] = [
     options: { A: 'Émile Zola', B: 'Stendhal', C: 'Gustave Flaubert', D: 'Honoré de Balzac' },
     correct: 'C',
   },
+    {
+    question: 'Quelle est la capitale de la Roumanie ?',
+    options: { A: 'Cluj-Napoca', B: 'Timișoara', C: 'Bucarest', D: 'Iași' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du carbone ?',
+    options: { A: 'Ca', B: 'Co', C: 'C', D: 'Cr' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Les Trois Mousquetaires ?',
+    options: { A: 'Victor Hugo', B: 'George Sand', C: 'Alexandre Dumas', D: 'Théophile Gautier' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le nom de la plus grande planète naine du système solaire ?',
+    options: { A: 'Cérès', B: 'Pluton', C: 'Éris', D: 'Makemake' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la République tchèque ?',
+    options: { A: 'Brno', B: 'Ostrava', C: 'Prague', D: 'Plzeň' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de jours compte une année non bissextile ?',
+    options: { A: '364', B: '366', C: '365', D: '360' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a peint La Cène à Milan ?',
+    options: { A: 'Michel-Ange', B: 'Raphaël', C: 'Léonard de Vinci', D: 'Titien' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le fleuve qui traverse la ville de Rome ?',
+    options: { A: 'L’Arno', B: 'Le Pô', C: 'Le Tibre', D: 'L’Adige' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel gaz est utilisé pour gonfler la plupart des ballons dirigeables modernes et certains ballons de fête non inflammables ?',
+    options: { A: 'Hydrogène', B: 'Méthane', C: 'Hélium', D: 'Azote' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Croatie ?',
+    options: { A: 'Split', B: 'Dubrovnik', C: 'Zagreb', D: 'Rijeka' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Le Rouge et le Noir ?',
+    options: { A: 'Gustave Flaubert', B: 'Honoré de Balzac', C: 'Stendhal', D: 'Émile Zola' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du soufre ?',
+    options: { A: 'Su', B: 'So', C: 'S', D: 'Sf' },
+    correct: 'C',
+  },
+  {
+    question: 'Dans quel pays se trouve le Taj Mahal ?',
+    options: { A: 'Pakistan', B: 'Népal', C: 'Inde', D: 'Bangladesh' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de côtés possède un heptagone ?',
+    options: { A: '5', B: '6', C: '7', D: '8' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a composé La Traviata ?',
+    options: { A: 'Giacomo Puccini', B: 'Gioachino Rossini', C: 'Giuseppe Verdi', D: 'Gaetano Donizetti' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de l’Écosse ?',
+    options: { A: 'Glasgow', B: 'Aberdeen', C: 'Édimbourg', D: 'Dundee' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est l’organe qui assure la vision en captant la lumière ?',
+    options: { A: 'L’oreille', B: 'La peau', C: 'L’œil', D: 'Le nez' },
+    correct: 'C',
+  },
+  {
+    question: 'En quelle année a eu lieu la bataille de Marignan ?',
+    options: { A: '1494', B: '1508', C: '1515', D: '1525' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le plus grand océan après l’océan Pacifique ?',
+    options: { A: 'Océan Indien', B: 'Océan Arctique', C: 'Océan Atlantique', D: 'Océan Austral' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Fahrenheit 451 ?',
+    options: { A: 'Isaac Asimov', B: 'Philip K. Dick', C: 'Ray Bradbury', D: 'Arthur C. Clarke' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Serbie ?',
+    options: { A: 'Novi Sad', B: 'Niš', C: 'Belgrade', D: 'Subotica' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique de l’argent ?',
+    options: { A: 'Ar', B: 'Au', C: 'Ag', D: 'Al' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel animal terrestre est connu pour sa longue trompe préhensile et ses défenses en ivoire ?',
+    options: { A: 'Rhinocéros', B: 'Tapir', C: 'Éléphant', D: 'Sanglier' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle mer borde les côtes de la Jordanie et d’Israël au sud ?',
+    options: { A: 'Mer Méditerranée', B: 'Mer Noire', C: 'Mer Rouge', D: 'Mer Caspienne' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a peint L’École d’Athènes au palais du Vatican ?',
+    options: { A: 'Léonard de Vinci', B: 'Michel-Ange', C: 'Raphaël', D: 'Le Pérugin' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de minutes y a-t-il dans une journée complète ?',
+    options: { A: '720', B: '1 000', C: '1 440', D: '2 400' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Thaïlande ?',
+    options: { A: 'Phuket', B: 'Chiang Mai', C: 'Bangkok', D: 'Pattaya' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit L’Île au trésor ?',
+    options: { A: 'Jules Verne', B: 'Daniel Defoe', C: 'Robert Louis Stevenson', D: 'Jonathan Swift' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel métal est le principal composant du bronze avec l’étain ?',
+    options: { A: 'Fer', B: 'Zinc', C: 'Cuivre', D: 'Nickel' },
+    correct: 'C',
+  },
+  {
+    question: 'Dans quel pays se trouve le désert d’Atacama, réputé pour son extrême sécheresse ?',
+    options: { A: 'Pérou', B: 'Argentine', C: 'Chili', D: 'Bolivie' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a composé les Nocturnes pour piano ?',
+    options: { A: 'Franz Liszt', B: 'Robert Schumann', C: 'Frédéric Chopin', D: 'Claude Debussy' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Corée du Sud ?',
+    options: { A: 'Busan', B: 'Incheon', C: 'Séoul', D: 'Daegu' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est l’élément chimique de symbole Ne ?',
+    options: { A: 'Nickel', B: 'Nobélium', C: 'Néon', D: 'Néodyme' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de joueurs composent une équipe de hockey sur glace sur la patinoire (gardien compris) ?',
+    options: { A: '5', B: '7', C: '6', D: '8' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Le Seigneur des Anneaux ?',
+    options: { A: 'C. S. Lewis', B: 'George R. R. Martin', C: 'J. R. R. Tolkien', D: 'Ursula K. Le Guin' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel fleuve arrose la ville de Lyon ?',
+    options: { A: 'La Loire', B: 'La Seine', C: 'Le Rhône', D: 'La Saône uniquement' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle planète est la deuxième plus grande du système solaire ?',
+    options: { A: 'Jupiter', B: 'Uranus', C: 'Saturne', D: 'Neptune' },
+    correct: 'C',
+  },
+  {
+    question: 'En quelle année a eu lieu la prise de la Bastille ?',
+    options: { A: '1776', B: '1787', C: '1789', D: '1792' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le plus petit océan du monde ?',
+    options: { A: 'Océan Indien', B: 'Océan Atlantique', C: 'Océan Arctique', D: 'Océan Austral' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a peint La Liberté guidant le peuple en 1830 ?',
+    options: { A: 'Théodore Géricault', B: 'Gustave Courbet', C: 'Eugène Delacroix', D: 'Jean-Auguste-Dominique Ingres' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de l’Argentine ?',
+    options: { A: 'Córdoba', B: 'Rosario', C: 'Buenos Aires', D: 'Mendoza' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le nom de la molécule qui porte l’information génétique chez la plupart des êtres vivants ?',
+    options: { A: 'ATP', B: 'ARNt', C: 'ADN', D: 'Insuline' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de côtés possède un nonagone ?',
+    options: { A: '7', B: '8', C: '9', D: '10' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Robinson Crusoé ?',
+    options: { A: 'Jonathan Swift', B: 'Henry Fielding', C: 'Daniel Defoe', D: 'Samuel Richardson' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle chaîne de montagnes sépare l’Europe de l’Asie en partie ?',
+    options: { A: 'Les Carpates', B: 'Les Alpes', C: 'L’Oural', D: 'Les Pyrénées' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du fluor ?',
+    options: { A: 'Fl', B: 'Fr', C: 'F', D: 'Fm' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Tunisie ?',
+    options: { A: 'Sousse', B: 'Sfax', C: 'Tunis', D: 'Kairouan' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel oiseau marin est célèbre pour son bec volumineux et coloré en saison de reproduction ?',
+    options: { A: 'Albatros', B: 'Cormoran', C: 'Macareux moine', D: 'Goéland' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a composé Le Boléro en 1928 ?',
+    options: { A: 'Claude Debussy', B: 'Erik Satie', C: 'Maurice Ravel', D: 'Camille Saint-Saëns' },
+    correct: 'C',
+  },
+  {
+    question: 'Dans quel pays se trouve la ville de Cracovie ?',
+    options: { A: 'République tchèque', B: 'Slovaquie', C: 'Pologne', D: 'Lituanie' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel organe produit l’insuline dans le corps humain ?',
+    options: { A: 'Le foie', B: 'La rate', C: 'Le pancréas', D: 'La thyroïde' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de zéros comporte un milliard dans l’échelle courte (utilisée en français et en anglais) ?',
+    options: { A: '6', B: '8', C: '9', D: '12' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Les Fleurs du mal ?',
+    options: { A: 'Arthur Rimbaud', B: 'Paul Verlaine', C: 'Charles Baudelaire', D: 'Stéphane Mallarmé' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale du Maroc ?',
+    options: { A: 'Casablanca', B: 'Marrakech', C: 'Rabat', D: 'Fès' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du lithium ?',
+    options: { A: 'Lt', B: 'Lh', C: 'Li', D: 'Lm' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel fleuve traverse la ville de Budapest ?',
+    options: { A: 'L’Elbe', B: 'Le Rhin', C: 'Le Danube', D: 'La Tisza' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a peint Le Baiser à Vienne ?',
+    options: { A: 'Egon Schiele', B: 'Oskar Kokoschka', C: 'Gustav Klimt', D: 'Arnold Böcklin' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le plus grand pays d’Amérique du Sud par sa superficie ?',
+    options: { A: 'Argentine', B: 'Pérou', C: 'Brésil', D: 'Colombie' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de cordes possède un violon accordé de façon standard ?',
+    options: { A: '3', B: '5', C: '4', D: '6' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Hamlet ?',
+    options: { A: 'Christopher Marlowe', B: 'Ben Jonson', C: 'William Shakespeare', D: 'John Webster' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Bulgarie ?',
+    options: { A: 'Plovdiv', B: 'Varna', C: 'Sofia', D: 'Bourgas' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est l’élément chimique de symbole Cl ?',
+    options: { A: 'Calcium', B: 'Chrome', C: 'Chlore', D: 'Cobalt' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel animal est le plus grand reptile vivant actuel ?',
+    options: { A: 'Python réticulé', B: 'Dragon de Komodo', C: 'Crocodile marin', D: 'Tortue luth' },
+    correct: 'C',
+  },
+  {
+    question: 'En quelle année l’ONU (Organisation des Nations unies) a-t-elle été officiellement créée ?',
+    options: { A: '1919', B: '1944', C: '1945', D: '1948' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le nom du détroit qui sépare l’Angleterre de la France ?',
+    options: { A: 'Détroit de Béring', B: 'Détroit de Gibraltar', C: 'Pas de Calais (détroit de Douvres)', D: 'Détroit d’Ormuz' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit La Peste ?',
+    options: { A: 'Jean-Paul Sartre', B: 'André Gide', C: 'Albert Camus', D: 'François Mauriac' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Slovaquie ?',
+    options: { A: 'Košice', B: 'Žilina', C: 'Bratislava', D: 'Nitra' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique de l’iode ?',
+    options: { A: 'Io', B: 'Id', C: 'I', D: 'In' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de degrés mesure un angle plat ?',
+    options: { A: '90°', B: '120°', C: '180°', D: '270°' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a composé Les Préludes ou la Rhapsodie hongroise n° 2 ?',
+    options: { A: 'Frédéric Chopin', B: 'Johannes Brahms', C: 'Franz Liszt', D: 'Richard Wagner' },
+    correct: 'C',
+  },
+  {
+    question: 'Dans quel pays se trouve la ville de Florence ?',
+    options: { A: 'Espagne', B: 'Portugal', C: 'Italie', D: 'Grèce' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le nom de la science qui étudie les plantes ?',
+    options: { A: 'La zoologie', B: 'La géologie', C: 'La botanique', D: 'L’écologie' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit L’Odyssée dans la Grèce antique ?',
+    options: { A: 'Sophocle', B: 'Hésiode', C: 'Homère', D: 'Euripide' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Slovénie ?',
+    options: { A: 'Maribor', B: 'Celje', C: 'Ljubljana', D: 'Koper' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du titane ?',
+    options: { A: 'Tn', B: 'Tt', C: 'Ti', D: 'Th' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel océan borde la côte est des États-Unis ?',
+    options: { A: 'Océan Pacifique', B: 'Océan Indien', C: 'Océan Atlantique', D: 'Océan Arctique' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a peint Le Déjeuner sur l’herbe en 1863 ?',
+    options: { A: 'Claude Monet', B: 'Edgar Degas', C: 'Édouard Manet', D: 'Gustave Caillebotte' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de joueurs composent une équipe de water-polo dans l’eau (gardien compris) ?',
+    options: { A: '5', B: '6', C: '7', D: '8' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale du Pérou ?',
+    options: { A: 'Cusco', B: 'Arequipa', C: 'Lima', D: 'Trujillo' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le gaz qui compose la majeure partie de l’atmosphère de Mars ?',
+    options: { A: 'Diazote', B: 'Dioxygène', C: 'Dioxyde de carbone', D: 'Argon' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Les Travailleurs de la mer ?',
+    options: { A: 'Jules Verne', B: 'Émile Zola', C: 'Victor Hugo', D: 'Guy de Maupassant' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel fleuve traverse la ville de Séville ?',
+    options: { A: 'L’Èbre', B: 'Le Tage', C: 'Le Guadalquivir', D: 'Le Douro' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du baryum ?',
+    options: { A: 'By', B: 'Br', C: 'Ba', D: 'Bh' },
+    correct: 'C',
+  },
+  {
+    question: 'Dans quel pays se trouve le site mégalithique de Stonehenge ?',
+    options: { A: 'Irlande', B: 'France', C: 'Royaume-Uni', D: 'Danemark' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a composé la Symphonie du Nouveau Monde (Symphonie n° 9) ?',
+    options: { A: 'Bedřich Smetana', B: 'Leoš Janáček', C: 'Antonín Dvořák', D: 'Gustav Mahler' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Lituanie ?',
+    options: { A: 'Kaunas', B: 'Klaipėda', C: 'Vilnius', D: 'Šiauliai' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est l’organe qui assure la filtration et la désintoxication de nombreuses substances dans le sang ?',
+    options: { A: 'Le poumon', B: 'Le rein', C: 'Le foie', D: 'La rate' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de jours compte une semaine ?',
+    options: { A: '5', B: '6', C: '7', D: '8' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Le Tour du monde en quatre-vingts jours ?',
+    options: { A: 'Alexandre Dumas', B: 'H. G. Wells', C: 'Jules Verne', D: 'Jack London' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle mer borde les côtes de la Grèce et de la Turquie à l’ouest de l’Anatolie ?',
+    options: { A: 'Mer Noire', B: 'Mer Adriatique', C: 'Mer Égée', D: 'Mer Ionienne' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le symbole chimique du bore ?',
+    options: { A: 'Bo', B: 'Br', C: 'B', D: 'Bh' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de la Lettonie ?',
+    options: { A: 'Daugavpils', B: 'Liepāja', C: 'Riga', D: 'Jūrmala' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel animal terrestre est réputé pour sa très grande taille grâce à son long cou ?',
+    options: { A: 'Chameau', B: 'Autruche', C: 'Girafe', D: 'Zèbre' },
+    correct: 'C',
+  },
+  {
+    question: 'En quelle année a eu lieu le premier vol motorisé et contrôlé des frères Wright ?',
+    options: { A: '1899', B: '1901', C: '1903', D: '1908' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a peint Les Ménines en 1656 ?',
+    options: { A: 'Francisco Goya', B: 'El Greco', C: 'Diego Vélasquez', D: 'Bartolomé Esteban Murillo' },
+    correct: 'C',
+  },
+  {
+    question: 'Quel est le plus long fleuve d’Allemagne ?',
+    options: { A: 'L’Elbe', B: 'Le Danube', C: 'Le Rhin', D: 'Le Weser' },
+    correct: 'C',
+  },
+  {
+    question: 'Combien de chiffres composent un code PIN à 4 chiffres ?',
+    options: { A: '2', B: '3', C: '4', D: '5' },
+    correct: 'C',
+  },
+  {
+    question: 'Qui a écrit Bel-Ami ?',
+    options: { A: 'Gustave Flaubert', B: 'Émile Zola', C: 'Guy de Maupassant', D: 'Honoré de Balzac' },
+    correct: 'C',
+  },
+  {
+    question: 'Quelle est la capitale de l’Estonie ?',
+    options: { A: 'Tartu', B: 'Pärnu', C: 'Tallinn', D: 'Narva' },
+    correct: 'C',
+  },
+]
+
 ]
