@@ -237,10 +237,6 @@ export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
     correct: 'A',
   },
   {
-    question: 'Quel duo français d’électro a sorti « One More Time » en 2000 ?',
-    options: { A: 'Justice', B: 'Daft Punk', C: 'Air', D: 'Cassius' },
-  },
-    {
     question: 'Quel chanteur français interprète « Les Démons de minuit » avec le groupe Images en 1986 ?',
     options: { A: 'Émile & Images', B: 'Mario Ramsamy & Jean-Louis Pujade', C: 'Gold', D: 'Partenaire Particulier' },
     correct: 'B',
