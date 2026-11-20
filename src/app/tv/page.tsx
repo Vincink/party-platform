@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { QUESTIONS, type QuizQuestion } from '@/data/questions'
+import { MUSIQUE_QUESTIONS } from '@/data/questions-musique'
 import { getPlayerColorTheme, getPlayerNeonStyle } from '@/lib/playerColors'
 
 interface Player {
@@ -20,6 +21,7 @@ interface RankedPlayer {
 }
 
 type GameType = 'quiz'
+type QuizTheme = 'culture' | 'musique'
 
 const GAME_OPTIONS: {
   id: GameType
@@ -32,6 +34,29 @@ const GAME_OPTIONS: {
     title: 'Quiz',
     subtitle: '4 choix • +10 / -5 pts',
     icon: '🧠',
+  },
+]
+
+const THEME_OPTIONS: {
+  id: QuizTheme
+  title: string
+  subtitle: string
+  icon: string
+  questions: QuizQuestion[]
+}[] = [
+  {
+    id: 'culture',
+    title: 'Culture générale',
+    subtitle: `${QUESTIONS.length} questions`,
+    icon: '🌍',
+    questions: QUESTIONS,
+  },
+  {
+    id: 'musique',
+    title: 'Musique & Tubes mondiaux',
+    subtitle: `${MUSIQUE_QUESTIONS.length} questions • Francophone, TV & classiques`,
+    icon: '🎵',
+    questions: MUSIQUE_QUESTIONS,
   },
 ]
 
@@ -54,6 +79,10 @@ const ANSWER_BUBBLE_STYLES: Record<string, string> = {
   B: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_14px_rgba(37,99,235,0.7)]',
   C: 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_14px_rgba(251,191,36,0.7)]',
   D: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_14px_rgba(5,150,105,0.7)]',
+}
+
+function getQuestionsForTheme(theme: QuizTheme): QuizQuestion[] {
+  return theme === 'musique' ? MUSIQUE_QUESTIONS : QUESTIONS
 }
 
 function shuffleQuestions(list: QuizQuestion[]): QuizQuestion[] {
@@ -98,6 +127,7 @@ export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [joinUrl, setJoinUrl] = useState<string>('')
   const [selectedGame, setSelectedGame] = useState<GameType>('quiz')
+  const [selectedTheme, setSelectedTheme] = useState<QuizTheme>('culture')
   const [playersList, setPlayersList] = useState<Player[]>([])
   const [dbError, setDbError] = useState<string>('')
   const [scoreLimit] = useState<number>(DEFAULT_SCORE_LIMIT)
@@ -114,12 +144,17 @@ export default function TVPage() {
 
   const initialized = useRef(false)
   const pinRef = useRef<string>('')
+  const selectedThemeRef = useRef<QuizTheme>('culture')
   const playersListRef = useRef<Player[]>([])
   const deckQuestionsRef = useRef<QuizQuestion[]>(QUESTIONS)
   const questionIndexRef = useRef<number>(0)
   const scoredQuestionIndexRef = useRef<number | null>(null)
   const isRevealingRef = useRef<boolean>(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    selectedThemeRef.current = selectedTheme
+  }, [selectedTheme])
 
   useEffect(() => {
     playersListRef.current = playersList
@@ -357,9 +392,14 @@ export default function TVPage() {
     setSelectedGame(game)
   }
 
+  function handleSelectTheme(theme: QuizTheme) {
+    selectedThemeRef.current = theme
+    setSelectedTheme(theme)
+  }
+
   function openGame() {
     stopTimerSound()
-    const shuffled = shuffleQuestions(QUESTIONS)
+    const shuffled = shuffleQuestions(getQuestionsForTheme(selectedThemeRef.current))
     deckQuestionsRef.current = shuffled
     setDeckQuestions(shuffled)
     setGameOpened(true)
@@ -376,7 +416,7 @@ export default function TVPage() {
   async function startGame() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
-    const shuffled = shuffleQuestions(QUESTIONS)
+    const shuffled = shuffleQuestions(getQuestionsForTheme(selectedThemeRef.current))
     deckQuestionsRef.current = shuffled
     setDeckQuestions(shuffled)
     setQuestionIndex(0)
@@ -467,7 +507,7 @@ export default function TVPage() {
       .update({ status: 'waiting' })
       .eq('room_code', currentPin)
 
-    const shuffled = shuffleQuestions(QUESTIONS)
+    const shuffled = shuffleQuestions(getQuestionsForTheme(selectedThemeRef.current))
     deckQuestionsRef.current = shuffled
     setDeckQuestions(shuffled)
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
@@ -484,6 +524,8 @@ export default function TVPage() {
 
   const activeGameOption =
     GAME_OPTIONS.find((g) => g.id === selectedGame) || GAME_OPTIONS[0]
+  const activeThemeOption =
+    THEME_OPTIONS.find((t) => t.id === selectedTheme) || THEME_OPTIONS[0]
   const currentQuestion = deckQuestions[questionIndex]
   const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
 
@@ -599,6 +641,35 @@ export default function TVPage() {
               </div>
             </div>
 
+            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
+              <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
+                Choix du thème
+              </p>
+              <div className="flex flex-wrap justify-center gap-4">
+                {THEME_OPTIONS.map((theme) => {
+                  const active = selectedTheme === theme.id
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => handleSelectTheme(theme.id)}
+                      className={`px-6 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all cursor-pointer ${
+                        active
+                          ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      <span className="text-4xl">{theme.icon}</span>
+                      <div>
+                        <p className="text-xl font-black">{theme.title}</p>
+                        <p className="text-xs text-indigo-200 font-semibold">{theme.subtitle}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
               <h2 className="text-xl font-bold text-indigo-300">
                 Joueurs connectés ({playersList.length})
@@ -628,7 +699,7 @@ export default function TVPage() {
                   onClick={openGame}
                   className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
                 >
-                  Ouvrir {activeGameOption.title}
+                  Ouvrir {activeGameOption.title} • {activeThemeOption.title}
                 </button>
               )}
             </div>
@@ -693,7 +764,7 @@ export default function TVPage() {
               {!gameRunning ? (
                 <div className="bg-slate-900 border border-slate-800 p-10 rounded-3xl shadow-2xl text-center space-y-4">
                   <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
-                    {activeGameOption.title} ouvert — prêt à démarrer
+                    {activeGameOption.title} ({activeThemeOption.title}) ouvert — prêt à démarrer
                   </p>
                   <h1 className="text-3xl md:text-4xl font-black">
                     {playersList.length} joueur{playersList.length > 1 ? 's' : ''} dans le salon
