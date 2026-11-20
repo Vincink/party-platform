@@ -99,7 +99,7 @@ export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
   {
     question: 'Quel générique emblématique accompagne « Pokémon » dès la fin des années 90 ?',
     options: { A: '« Attrapez-les tous »', B: '« Il faut tous les attraper »', C: '« Le Roi des Pokémon »', D: '« À l’attaque Pikachu »' },
-    correct: 'B',
+    correct: 'A',
   },
   {
     question: 'Quel artiste a sorti le tube « Blinding Lights » en 2019 ?',
