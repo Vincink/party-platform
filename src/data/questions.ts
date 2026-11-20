@@ -1501,5 +1501,3 @@ export const QUESTIONS: QuizQuestion[] = [
     correct: 'C',
   },
 ]
-
-]
