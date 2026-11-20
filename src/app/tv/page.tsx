@@ -42,21 +42,18 @@ const THEME_OPTIONS: {
   title: string
   subtitle: string
   icon: string
-  questions: QuizQuestion[]
 }[] = [
   {
     id: 'culture',
     title: 'Culture générale',
     subtitle: `${QUESTIONS.length} questions`,
     icon: '🌍',
-    questions: QUESTIONS,
   },
   {
     id: 'musique',
     title: 'Musique & Tubes mondiaux',
     subtitle: `${MUSIQUE_QUESTIONS.length} questions • Francophone, TV & classiques`,
     icon: '🎵',
-    questions: MUSIQUE_QUESTIONS,
   },
 ]
 
@@ -395,6 +392,9 @@ export default function TVPage() {
   function handleSelectTheme(theme: QuizTheme) {
     selectedThemeRef.current = theme
     setSelectedTheme(theme)
+    const shuffled = shuffleQuestions(getQuestionsForTheme(theme))
+    deckQuestionsRef.current = shuffled
+    setDeckQuestions(shuffled)
   }
 
   function openGame() {
@@ -641,35 +641,6 @@ export default function TVPage() {
               </div>
             </div>
 
-            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                Choix du thème
-              </p>
-              <div className="flex flex-wrap justify-center gap-4">
-                {THEME_OPTIONS.map((theme) => {
-                  const active = selectedTheme === theme.id
-                  return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => handleSelectTheme(theme.id)}
-                      className={`px-6 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all cursor-pointer ${
-                        active
-                          ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
-                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
-                      }`}
-                    >
-                      <span className="text-4xl">{theme.icon}</span>
-                      <div>
-                        <p className="text-xl font-black">{theme.title}</p>
-                        <p className="text-xs text-indigo-200 font-semibold">{theme.subtitle}</p>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
             <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
               <h2 className="text-xl font-bold text-indigo-300">
                 Joueurs connectés ({playersList.length})
@@ -699,7 +670,7 @@ export default function TVPage() {
                   onClick={openGame}
                   className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
                 >
-                  Ouvrir {activeGameOption.title} • {activeThemeOption.title}
+                  Ouvrir {activeGameOption.title}
                 </button>
               )}
             </div>
@@ -762,15 +733,47 @@ export default function TVPage() {
 
             <div className="lg:col-span-7 space-y-6">
               {!gameRunning ? (
-                <div className="bg-slate-900 border border-slate-800 p-10 rounded-3xl shadow-2xl text-center space-y-4">
-                  <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
-                    {activeGameOption.title} ({activeThemeOption.title}) ouvert — prêt à démarrer
-                  </p>
-                  <h1 className="text-3xl md:text-4xl font-black">
-                    {playersList.length} joueur{playersList.length > 1 ? 's' : ''} dans le salon
-                  </h1>
+                <div className="bg-slate-900 border border-slate-800 p-8 md:p-10 rounded-3xl shadow-2xl text-center space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                      {activeGameOption.title} ouvert — prêt à démarrer
+                    </p>
+                    <h1 className="text-3xl md:text-4xl font-black">
+                      {playersList.length} joueur{playersList.length > 1 ? 's' : ''} dans le salon
+                    </h1>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
+                      Choix du thème
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {THEME_OPTIONS.map((theme) => {
+                        const active = selectedTheme === theme.id
+                        return (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            onClick={() => handleSelectTheme(theme.id)}
+                            className={`px-5 py-3.5 rounded-2xl border-2 flex items-center gap-3 text-left transition-all cursor-pointer ${
+                              active
+                                ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
+                                : 'bg-slate-950/70 border-slate-700 text-slate-300 hover:border-slate-500'
+                            }`}
+                          >
+                            <span className="text-3xl">{theme.icon}</span>
+                            <div>
+                              <p className="text-lg font-black">{theme.title}</p>
+                              <p className="text-xs text-indigo-200 font-semibold">{theme.subtitle}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   <p className="text-slate-400 text-base">
-                    Clique sur « Démarrer le jeu » pour lancer le décompte de 3 secondes.
+                    Thème sélectionné : <span className="text-white font-bold">{activeThemeOption.title}</span> — clique sur « Démarrer le jeu » pour lancer le décompte de 3 secondes.
                   </p>
                 </div>
               ) : (
