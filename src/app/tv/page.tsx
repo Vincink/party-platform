@@ -413,6 +413,34 @@ export default function TVPage() {
     setTimeLeft(QUESTION_DURATION)
   }
 
+  async function backToGameSelection() {
+    stopTimerSound()
+    const currentPin = pin || pinRef.current
+
+    setStartCountdown(null)
+    setGameRunning(false)
+    setGameFinished(false)
+    setRevealAnswers(false)
+    setScoredQuestionIndex(null)
+    scoredQuestionIndexRef.current = null
+    setQuestionIndex(0)
+    setTimeLeft(QUESTION_DURATION)
+    setGameOpened(false)
+
+    if (currentPin) {
+      await supabase
+        .from('players')
+        .update({ answer: null })
+        .eq('session_id', currentPin)
+      await supabase
+        .from('rooms')
+        .update({ status: 'waiting' })
+        .eq('room_code', currentPin)
+    }
+
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
+  }
+
   async function startGame() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
@@ -848,13 +876,22 @@ export default function TVPage() {
               <div className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                   {!gameRunning ? (
-                    <button
-                      type="button"
-                      onClick={() => void startGame()}
-                      className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
-                    >
-                      Démarrer le jeu
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void startGame()}
+                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                      >
+                        Démarrer le jeu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void backToGameSelection()}
+                        className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-lg rounded-xl transition-all cursor-pointer"
+                      >
+                        Sélection du jeu
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
