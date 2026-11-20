@@ -9,7 +9,7 @@ export interface QuizQuestion {
   correct: 'A' | 'B' | 'C' | 'D'
 }
 
-export const QUESTIONS: QuizQuestion[] = [
+export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
   {
       question: 'Quel chanteur français interprète « Les Lacs du Connemara » sorti en 1981 ?',
       options: { A: 'Patrick Bruel', B: 'Jean-Jacques Goldman', C: 'Alain Bashung', D: 'Michel Sardou' },
