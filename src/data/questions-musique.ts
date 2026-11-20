@@ -67,7 +67,7 @@ export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
     correct: 'B',
   },
   {
-    question: 'Quel personnage de dessin animé est accompagné de son générique « Toujours prêt, pour l’aventure… » / « Inspecteur Gadget » ?',
+    question: 'Quel personnage de dessin animé est accompagné de son générique « Toujours prêt, pour l’aventure… » ?',
     options: { A: 'Columbo', B: 'Inspecteur Gadget', C: 'Lupin III', D: 'Tintin' },
     correct: 'B',
   },
@@ -142,7 +142,7 @@ export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
     correct: 'B',
   },
   {
-    question: 'Dans quel dessin animé voit-on trois sœurs voleuses d’œuvres d’art la nuit sous le générique « Signé Cat’s Eyes » ?',
+    question: 'Dans quel dessin animé voit-on trois sœurs voleuses d’œuvres d’art la nuit ?',
     options: { A: 'Lady Oscar', B: 'Cat’s Eyes', C: 'Embrasse-moi Lucile', D: 'Max et Compagnie' },
     correct: 'B',
   },
@@ -532,7 +532,7 @@ export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
     correct: 'A',
   },
   {
-    question: 'Qui chante « Les Champs-Élysées » ? Non, qui chante « L’Été indien » en 1975 ?',
+    question: 'Qui chante « Les Champs-Élysées » ?',
     options: { A: 'Joe Dassin', B: 'Julien Clerc', C: 'Michel Fugain', D: 'Serge Lama' },
     correct: 'A',
   },
