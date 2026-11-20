@@ -226,9 +226,9 @@ export const MUSIQUE_QUESTIONS: QuizQuestion[] = [
     options: { A: 'Bryan Adams', B: 'Sting', C: 'Phil Collins', D: 'Rod Stewart' },
     correct: 'B',
   },
-  {
-    question: 'Quel groupe français chante « J’ai demandé à la lune » en 2002 ?',
-    options: { A: 'Louise Attaque', B: 'Indochine', C: 'Téléphone', D: 'Superbus' },
+    {
+    question: 'Quel duo français d’électro a sorti « One More Time » en 2000 ?',
+    options: { A: 'Justice', B: 'Daft Punk', C: 'Air', D: 'Cassius' },
     correct: 'B',
   },
   {
