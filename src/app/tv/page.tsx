@@ -205,6 +205,8 @@ export default function TVPage() {
   const selectedGameRef = useRef<GameType>('quiz')
   const selectedThemeRef = useRef<QuizTheme>('culture')
   const playersListRef = useRef<Player[]>([])
+  const gameRunningRef = useRef<boolean>(false)
+  const gameFinishedRef = useRef<boolean>(false)
   const deckQuestionsRef = useRef<QuizQuestion[]>(deckQuestions)
   const questionIndexRef = useRef<number>(0)
   const scoredQuestionIndexRef = useRef<number | null>(null)
@@ -226,6 +228,14 @@ export default function TVPage() {
   useEffect(() => {
     playersListRef.current = playersList
   }, [playersList])
+
+  useEffect(() => {
+    gameRunningRef.current = gameRunning
+  }, [gameRunning])
+
+  useEffect(() => {
+    gameFinishedRef.current = gameFinished
+  }, [gameFinished])
 
   useEffect(() => {
     deckQuestionsRef.current = deckQuestions
@@ -292,12 +302,12 @@ export default function TVPage() {
     !gameFinished &&
     bacPhase === 'playing'
 
-  const isSoundActive = isQuizActive || isBacPlayingActive
+  const isSoundActive = isQuizActive
 
   useEffect(() => {
-    if (!soundEnabled) {
+    if (!soundEnabled || !isSoundActive) {
       stopTimerSound()
-    } else if (isSoundActive) {
+    } else {
       startTimerSound()
     }
   }, [soundEnabled, isSoundActive, stopTimerSound, startTimerSound])
@@ -443,6 +453,8 @@ export default function TVPage() {
           filter: `session_id=eq.${randomPin}`,
         },
         (payload) => {
+          // Entrée autorisée uniquement entre deux parties
+          if (gameRunningRef.current || gameFinishedRef.current) return
           const newPlayer = payload.new as Player
           setPlayersList((prev) =>
             prev.some((p) => p.id === newPlayer.id)
@@ -477,6 +489,7 @@ export default function TVPage() {
     }
   }, [])
 
+  // Décompte 3, 2, 1 sans déclaration de fonction imbriquée dans un bloc
   useEffect(() => {
     if (!gameRunning || startCountdown === null || gameFinished) return
 
@@ -496,6 +509,8 @@ export default function TVPage() {
               .update({ status: 'playing:0', game_type: 'quiz' })
               .eq('room_code', currentPin)
           }
+          setStartCountdown(null)
+          startTimerSound()
         } else {
           const firstRound = bacRoundsRef.current[0]
           setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
@@ -509,9 +524,8 @@ export default function TVPage() {
               })
               .eq('room_code', currentPin)
           }
+          setStartCountdown(null)
         }
-        setStartCountdown(null)
-        startTimerSound()
       }
 
       void launchRoundOne()
@@ -529,9 +543,7 @@ export default function TVPage() {
 
   useEffect(() => {
     if (!isQuizActive) {
-      if (!isBacPlayingActive) {
-        stopTimerSound()
-      }
+      stopTimerSound()
       return
     }
 
@@ -552,17 +564,19 @@ export default function TVPage() {
       window.clearInterval(timer)
       stopTimerSound()
     }
-  }, [isQuizActive, isBacPlayingActive, questionIndex, triggerRevealAndScoreQuiz, startTimerSound, stopTimerSound])
+  }, [isQuizActive, questionIndex, triggerRevealAndScoreQuiz, startTimerSound, stopTimerSound])
+
+  const answeredCount = playersList.filter((p) => Boolean(p.answer && p.answer.trim())).length
+  const allPlayersAnsweredBac =
+    isBacPlayingActive && playersList.length > 0 && answeredCount >= playersList.length
 
   useEffect(() => {
-    if (!isBacPlayingActive) {
-      if (!isQuizActive) {
-        stopTimerSound()
-      }
+    if (!isBacPlayingActive) return
+
+    if (allPlayersAnsweredBac) {
+      void triggerBacReveal()
       return
     }
-
-    startTimerSound()
 
     const timer = window.setInterval(() => {
       setBacTimeLeft((prev) => {
@@ -577,9 +591,8 @@ export default function TVPage() {
 
     return () => {
       window.clearInterval(timer)
-      stopTimerSound()
     }
-  }, [isBacPlayingActive, isQuizActive, bacRoundIndex, triggerBacReveal, startTimerSound, stopTimerSound])
+  }, [isBacPlayingActive, allPlayersAnsweredBac, bacRoundIndex, triggerBacReveal])
 
   function handleSelectGame(game: GameType) {
     selectedGameRef.current = game
@@ -891,7 +904,6 @@ export default function TVPage() {
     THEME_OPTIONS.find((t) => t.id === selectedTheme) || THEME_OPTIONS[0]
   const currentQuestion = deckQuestions[questionIndex]
   const currentBacRound = bacRounds[bacRoundIndex]
-  const answeredCount = playersList.filter((p) => Boolean(p.answer && p.answer.trim())).length
 
   const rankedPlayers = computeDenseRanks(playersList)
   const isLastQuizQuestion = questionIndex >= deckQuestions.length - 1
@@ -929,9 +941,15 @@ export default function TVPage() {
           <span className="text-sm font-bold uppercase tracking-widest text-slate-400">
             Salon Animateur
           </span>
-          <span className="text-xl font-black tracking-widest text-indigo-400">
-            PIN : {pin || '----'}
-          </span>
+          {!gameOpened ? (
+            <span className="text-xl font-black tracking-widest text-indigo-400">
+              PIN : {pin || '----'}
+            </span>
+          ) : (
+            <span className="text-xl font-black tracking-widest text-amber-300">
+              Partie en cours
+            </span>
+          )}
           <div className="flex items-center gap-3">
             <button
               type="button"
