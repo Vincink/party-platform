@@ -1,8 +1,10 @@
 'use client'
 
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
+  const router = useRouter()
+
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-8 md:px-14 md:py-12">
       <style>{`
@@ -57,11 +59,12 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          <Link
-            href="/tv"
-            className="tvos-card group relative min-h-[220px] md:min-h-[250px] p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between overflow-hidden"
+          <button
+            type="button"
+            onClick={() => router.push('/tv')}
+            className="tvos-card group relative min-h-[220px] md:min-h-[250px] p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 w-full">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
                 Grand écran
               </span>
@@ -78,13 +81,14 @@ export default function HomePage() {
                 Lance le salon et affiche le code QR sur grand écran.
               </p>
             </div>
-          </Link>
+          </button>
 
-          <Link
-            href="/player"
-            className="tvos-card group relative min-h-[220px] md:min-h-[250px] p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between overflow-hidden"
+          <button
+            type="button"
+            onClick={() => router.push('/player')}
+            className="tvos-card group relative min-h-[220px] md:min-h-[250px] p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 w-full">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
                 Smartphone
               </span>
@@ -101,7 +105,7 @@ export default function HomePage() {
                 Entre le code de la partie depuis ton smartphone.
               </p>
             </div>
-          </Link>
+          </button>
         </div>
       </section>
 
