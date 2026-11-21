@@ -142,7 +142,11 @@ function computeDenseRanks(players: Player[]): RankedPlayer[] {
   return result
 }
 
-function formatVerdictBadge(verdict: PetitBacVerdict, isCloseMatch: boolean) {
+function formatVerdictBadge(entry?: EvaluatedPetitBacEntry, hasRawAnswer = false) {
+  const verdict: PetitBacVerdict = entry?.verdict ?? (hasRawAnswer ? 'unique' : 'empty')
+  const isCloseMatch = Boolean(entry?.isCloseMatch)
+  const needsManualCheck = Boolean(entry?.needsManualCheck)
+
   if (verdict === 'unique') {
     return {
       label: 'Unique • +10 pts',
@@ -157,7 +161,7 @@ function formatVerdictBadge(verdict: PetitBacVerdict, isCloseMatch: boolean) {
   }
   if (verdict === 'rejected') {
     return {
-      label: 'Refusé • 0 pt',
+      label: needsManualCheck ? 'Hors liste / À vérifier • 0 pt' : 'Refusé • 0 pt',
       className: 'bg-rose-500/20 border-rose-400 text-rose-300',
     }
   }
@@ -375,7 +379,11 @@ export default function TVPage() {
     const round = bacRoundsRef.current[roundIdx]
     const currentPlayers = playersListRef.current
 
-    const evaluatedList = evaluatePetitBacAnswers(currentPlayers, round?.letter ?? '')
+    const evaluatedList = evaluatePetitBacAnswers(
+      currentPlayers,
+      round?.letter ?? '',
+      round?.category ?? ''
+    )
     const mapByPlayer: Record<number, EvaluatedPetitBacEntry> = {}
     for (const item of evaluatedList) {
       mapByPlayer[item.playerId] = item
@@ -469,7 +477,6 @@ export default function TVPage() {
     }
   }, [])
 
-  // Décompte 3, 2, 1 sans déclaration de fonction imbriquée dans un bloc
   useEffect(() => {
     if (!gameRunning || startCountdown === null || gameFinished) return
 
@@ -1285,8 +1292,9 @@ export default function TVPage() {
                         <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
                           {playersList.map((p) => {
                             const entry = bacEvaluations[p.id]
-                            const verdict = entry?.verdict ?? (p.answer?.trim() ? 'unique' : 'empty')
-                            const badge = formatVerdictBadge(verdict, Boolean(entry?.isCloseMatch))
+                            const hasRawAnswer = Boolean(p.answer?.trim())
+                            const verdict = entry?.verdict ?? (hasRawAnswer ? 'unique' : 'empty')
+                            const badge = formatVerdictBadge(entry, hasRawAnswer)
 
                             return (
                               <div
@@ -1298,7 +1306,7 @@ export default function TVPage() {
                                     {getDisplayName(p, playersList)}
                                   </p>
                                   <p className="text-2xl font-black text-white truncate">
-                                    {p.answer?.trim() ? p.answer.trim() : '—'}
+                                    {hasRawAnswer ? p.answer!.trim() : '—'}
                                   </p>
                                 </div>
 
