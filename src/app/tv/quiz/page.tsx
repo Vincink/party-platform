@@ -466,7 +466,7 @@ export default function TvQuizPage() {
         <div className="relative h-full min-h-0 p-6 md:p-8 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
           <div className="flex items-start justify-end shrink-0">
             <span
-              className={`inline-flex items-center px-4 py-2 rounded-2xl text-lg sm:text-xl font-extrabold uppercase tracking-[0.12em] border tabular-nums shrink-0 ${
+              className={`inline-flex items-center px-5 py-2.5 rounded-2xl text-2xl sm:text-3xl font-black uppercase tracking-[0.1em] border tabular-nums shrink-0 ${
                 isDangerBlink
                   ? 'chrono-blink-red shadow-[0_0_24px_rgba(239,68,68,0.75)]'
                   : 'bg-white/[0.14] border-white/25 text-white'
@@ -508,16 +508,16 @@ export default function TvQuizPage() {
                   >
                     <span
                       style={{ backgroundColor: colorStyle.letterBadgeBg }}
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold text-white shrink-0"
+                      className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl font-black text-white shrink-0"
                     >
                       {String.fromCharCode(65 + idx)}
                     </span>
 
-                    <span className="flex-1 text-center text-2xl sm:text-3xl font-bold text-white truncate">
+                    <span className="flex-1 text-center text-3xl sm:text-4xl font-bold text-white truncate">
                       {opt}
                     </span>
 
-                    <span className="w-12 shrink-0" aria-hidden="true" />
+                    <span className="w-14 shrink-0" aria-hidden="true" />
                   </div>
                 );
               })}
@@ -590,12 +590,12 @@ export default function TvQuizPage() {
                           backgroundColor: palette.badgeBg,
                           color: palette.badgeText,
                         }}
-                        className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-bold shrink-0"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-lg font-bold shrink-0"
                       >
                         {index + 1}
                       </span>
                       <p
-                        className="font-bold text-xl truncate"
+                        className="font-bold text-2xl truncate"
                         style={{ color: palette.text }}
                       >
                         {name}
@@ -607,7 +607,7 @@ export default function TvQuizPage() {
                         backgroundColor: palette.badgeBg,
                         color: palette.badgeText,
                       }}
-                      className="rounded-xl px-3.5 py-1.5 text-lg font-extrabold shrink-0"
+                      className="rounded-xl px-4 py-1.5 text-xl sm:text-2xl font-extrabold shrink-0"
                     >
                       {score} pts
                     </span>
