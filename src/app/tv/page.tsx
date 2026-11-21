@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type GameMode = 'quiz' | 'petit-bac';
@@ -29,6 +29,17 @@ interface PlayerRow {
   client_id: string | null;
 }
 
+const FALLBACK_COLORS = [
+  '#38bdf8',
+  '#34d399',
+  '#fbbf24',
+  '#f472b6',
+  '#a78bfa',
+  '#fb923c',
+  '#22d3ee',
+  '#4ade80',
+];
+
 function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   if (!raw) return {};
   if (typeof raw === 'string') {
@@ -41,220 +52,18 @@ function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   return raw;
 }
 
-function buildQrMatrix(text: string): boolean[][] {
-  const size = 25;
-  const matrix: boolean[][] = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => false)
-  );
-  const reserved: boolean[][] = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => false)
-  );
-
-  const placeFinder = (top: number, left: number) => {
-    for (let r = -1; r <= 7; r++) {
-      for (let c = -1; c <= 7; c++) {
-        const rr = top + r;
-        const cc = left + c;
-        if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
-        reserved[rr][cc] = true;
-        const isBorder = r === 0 || r === 6 || c === 0 || c === 6;
-        const isCore = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-        matrix[rr][cc] = r >= 0 && r <= 6 && c >= 0 && c <= 6 && (isBorder || isCore);
-      }
-    }
-  };
-
-  placeFinder(0, 0);
-  placeFinder(0, size - 7);
-  placeFinder(size - 7, 0);
-
-  for (let r = 16; r <= 20; r++) {
-    for (let c = 16; c <= 20; c++) {
-      reserved[r][c] = true;
-      const distR = Math.abs(r - 18);
-      const distC = Math.abs(c - 18);
-      matrix[r][c] = distR === 2 || distC === 2 || (r === 18 && c === 18);
-    }
+function resolvePlayerColor(avatar: string | null, index: number): string {
+  const trimmed = (avatar || '').trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed)) {
+    return trimmed;
   }
-
-  for (let i = 0; i < size; i++) {
-    if (!reserved[6][i]) {
-      reserved[6][i] = true;
-      matrix[6][i] = i % 2 === 0;
-    }
-    if (!reserved[i][6]) {
-      reserved[i][6] = true;
-      matrix[i][6] = i % 2 === 0;
-    }
+  if (/^(rgb|rgba|hsl|hsla)\(/i.test(trimmed)) {
+    return trimmed;
   }
-
-  reserved[17][8] = true;
-  matrix[17][8] = true;
-
-  const formatCoords: Array<[number, number]> = [
-    [0, 8],
-    [1, 8],
-    [2, 8],
-    [3, 8],
-    [4, 8],
-    [5, 8],
-    [7, 8],
-    [8, 8],
-    [8, 7],
-    [8, 5],
-    [8, 4],
-    [8, 3],
-    [8, 2],
-    [8, 1],
-    [8, 0],
-  ];
-  const secondaryFormatCoords: Array<[number, number]> = [
-    [24, 8],
-    [23, 8],
-    [22, 8],
-    [21, 8],
-    [20, 8],
-    [19, 8],
-    [18, 8],
-    [8, 17],
-    [8, 18],
-    [8, 19],
-    [8, 20],
-    [8, 21],
-    [8, 22],
-    [8, 23],
-    [8, 24],
-  ];
-
-  for (const [r, c] of formatCoords) reserved[r][c] = true;
-  for (const [r, c] of secondaryFormatCoords) reserved[r][c] = true;
-
-  const payload = text.slice(0, 42);
-  const bits: number[] = [0, 1, 0, 0];
-  const len = payload.length;
-  for (let b = 7; b >= 0; b--) bits.push((len >> b) & 1);
-  for (let i = 0; i < len; i++) {
-    const code = payload.charCodeAt(i) & 0xff;
-    for (let b = 7; b >= 0; b--) bits.push((code >> b) & 1);
+  if (/^[a-zA-Z]{3,20}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
   }
-
-  const totalDataCodewords = 44;
-  const maxDataBits = totalDataCodewords * 8;
-  for (let i = 0; i < 4 && bits.length < maxDataBits; i++) bits.push(0);
-  while (bits.length % 8 !== 0) bits.push(0);
-
-  const dataBytes: number[] = [];
-  for (let i = 0; i < bits.length && dataBytes.length < totalDataCodewords; i += 8) {
-    let val = 0;
-    for (let b = 0; b < 8; b++) val = (val << 1) | (bits[i + b] ?? 0);
-    dataBytes.push(val);
-  }
-
-  const pads = [0xec, 0x11];
-  let padIdx = 0;
-  while (dataBytes.length < totalDataCodewords) {
-    dataBytes.push(pads[padIdx % 2]);
-    padIdx++;
-  }
-
-  const exp = new Array<number>(512).fill(0);
-  const log = new Array<number>(256).fill(0);
-  let x = 1;
-  for (let i = 0; i < 255; i++) {
-    exp[i] = x;
-    log[x] = i;
-    x <<= 1;
-    if ((x & 0x100) !== 0) x ^= 0x11d;
-  }
-  for (let i = 0; i < 255; i++) exp[i + 255] = exp[i];
-
-  const ecLen = 10;
-  let gen = [1];
-  for (let i = 0; i < ecLen; i++) {
-    const next = new Array<number>(gen.length + 1).fill(0);
-    for (let a = 0; a < gen.length; a++) {
-      next[a] ^= gen[a];
-      if (gen[a] !== 0) {
-        next[a + 1] ^= exp[(log[gen[a]] + i) % 255];
-      }
-    }
-    gen = next;
-  }
-
-  const msg = [...dataBytes, ...new Array<number>(ecLen).fill(0)];
-  for (let i = 0; i < dataBytes.length; i++) {
-    const coef = msg[i];
-    if (coef !== 0) {
-      for (let j = 0; j < gen.length; j++) {
-        msg[i + j] ^= exp[(log[coef] + log[gen[j]]) % 255];
-      }
-    }
-  }
-  const eccBytes = msg.slice(dataBytes.length);
-
-  const allBits: number[] = [];
-  for (const byte of [...dataBytes, ...eccBytes]) {
-    for (let b = 7; b >= 0; b--) allBits.push((byte >> b) & 1);
-  }
-
-  let bitPtr = 0;
-  let goingUp = true;
-  for (let col = size - 1; col >= 1; col -= 2) {
-    if (col === 6) col = 5;
-    for (let step = 0; step < size; step++) {
-      const r = goingUp ? size - 1 - step : step;
-      for (let offset = 0; offset <= 1; offset++) {
-        const c = col - offset;
-        if (c < 0 || reserved[r][c]) continue;
-        const rawBit = allBits[bitPtr] ?? 0;
-        bitPtr++;
-        const masked = (r + c) % 2 === 0 ? rawBit ^ 1 : rawBit;
-        matrix[r][c] = masked === 1;
-      }
-    }
-    goingUp = !goingUp;
-  }
-
-  const formatBits = 0x77c4;
-  for (let i = 0; i < 15; i++) {
-    const bit = ((formatBits >> (14 - i)) & 1) === 1;
-    const [r1, c1] = formatCoords[i];
-    const [r2, c2] = secondaryFormatCoords[i];
-    matrix[r1][c1] = bit;
-    matrix[r2][c2] = bit;
-  }
-
-  return matrix;
-}
-
-function QrCodeSvg({ value }: { value: string }) {
-  const matrix = useMemo(() => buildQrMatrix(value), [value]);
-  const count = matrix.length;
-
-  return (
-    <svg
-      viewBox={`0 0 ${count} ${count}`}
-      className="w-44 h-44 rounded-xl bg-white p-2.5 shadow-inner shrink-0"
-      role="img"
-      aria-label={`QR Code : ${value}`}
-    >
-      <rect x={0} y={0} width={count} height={count} fill="#ffffff" />
-      {matrix.map((row, r) =>
-        row.map((cell, c) =>
-          cell ? (
-            <rect
-              key={`${r}-${c}`}
-              x={c}
-              y={r}
-              width={1}
-              height={1}
-              fill="#090d16"
-            />
-          ) : null
-        )
-      )}
-    </svg>
-  );
+  return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 }
 
 export default function TvPage() {
@@ -263,6 +72,7 @@ export default function TvPage() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [selectedGame, setSelectedGame] = useState<GameMode>('quiz');
   const [originUrl, setOriginUrl] = useState<string>('');
+  const [qrError, setQrError] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -357,7 +167,7 @@ export default function TvPage() {
   useEffect(() => {
     void refreshTvData();
 
-    const channel = supabase.channel(`tv-lobby-${roomCode || 'latest'}`);
+    const channel = supabase.channel(`tv-tvos-${roomCode || 'latest'}`);
 
     if (roomCode) {
       channel.on(
@@ -425,191 +235,256 @@ export default function TvPage() {
     ? `${originUrl}/player?code=${encodeURIComponent(activeRoomCode)}`
     : `/player?code=${encodeURIComponent(activeRoomCode)}`;
 
+  useEffect(() => {
+    setQrError(false);
+  }, [joinUrl]);
+
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${encodeURIComponent(
+    joinUrl
+  )}`;
+
   return (
-    <main className="min-h-screen w-full bg-slate-950 text-white p-5 lg:p-7 flex flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4 mb-6">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-sky-400">
-            Salon TV • {activeRoomCode}
-          </p>
-          <h1 className="text-2xl lg:text-3xl font-black tracking-tight">
-            Choisissez un jeu pour lancer la partie
+    <main className="relative min-h-screen w-full bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-6 md:px-10 md:py-8">
+      <style>{`
+        html, body {
+          overscroll-behavior: none;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        }
+        .tvos-card {
+          transition:
+            transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 240ms ease,
+            background 240ms ease;
+        }
+        .tvos-card:hover,
+        .tvos-card:focus-visible {
+          transform: scale(1.02) translateY(-2px);
+          box-shadow:
+            0 24px 55px -12px rgba(2, 6, 23, 0.75),
+            0 0 0 2px rgba(255, 255, 255, 0.7);
+          outline: none;
+        }
+      `}</style>
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_85%_60%_at_50%_0%,rgba(59,130,246,0.34),rgba(14,23,42,0))]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
+      />
+
+      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 max-w-7xl w-full mx-auto mb-6">
+        <div className="space-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
+            tvOS • Salon {activeRoomCode}
+          </span>
+          <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white">
+            Prépare ta partie
           </h1>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 border border-white/10 px-4 py-2 text-sm font-bold text-slate-200">
-          {players.length} joueur{players.length > 1 ? 's' : ''} connecté
-          {players.length > 1 ? 's' : ''}
-        </div>
+        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
+          {players.length} joueur{players.length > 1 ? 's' : ''} connecté{players.length > 1 ? 's' : ''}
+        </span>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_340px] gap-6 flex-1 items-stretch">
-        {/* Colonne 1 (Gauche) : QR Code */}
-        <section className="rounded-3xl bg-slate-900/90 border border-white/10 p-6 flex flex-col items-center justify-center text-center gap-4">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            Rejoindre avec le téléphone
+      <section className="relative z-10 max-w-7xl w-full mx-auto my-auto grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        {/* Colonne 1 : QR Code */}
+        <div className="tvos-card p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-center text-center gap-4">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+            Connexion rapide
           </span>
+          <h2 className="text-xl font-semibold tracking-tight text-white">
+            Scanne le QR code
+          </h2>
 
-          <QrCodeSvg value={joinUrl} />
+          {!qrError ? (
+            <div className="p-3 rounded-2xl bg-white shadow-[0_14px_30px_-8px_rgba(2,6,23,0.75)]">
+              <img
+                src={qrSrc}
+                alt={`QR code pour rejoindre le salon ${activeRoomCode}`}
+                className="w-40 h-40 sm:w-44 sm:h-44 block rounded-lg"
+                onError={() => setQrError(true)}
+              />
+            </div>
+          ) : (
+            <div className="w-44 h-44 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center p-4 text-xs text-slate-300">
+              Code salon : {activeRoomCode}
+            </div>
+          )}
 
           <div className="space-y-1">
-            <p className="text-xs text-slate-400">Code du salon</p>
-            <p className="text-2xl font-black tracking-widest text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Code du salon
+            </p>
+            <p className="text-2xl font-semibold tracking-[0.2em] text-white">
               {activeRoomCode}
             </p>
           </div>
+        </div>
 
-          <p className="text-xs text-slate-400 break-all max-w-full">
-            {joinUrl}
-          </p>
-        </section>
-
-        {/* Colonne 2 (Centre) : Choix du jeu (Quiz / Petit Bac) avec icônes SVG */}
-        <section className="rounded-3xl bg-slate-900/70 border border-white/10 p-6 flex flex-col justify-center gap-5">
-          <div className="text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              Choix du jeu
-            </p>
-            <h2 className="text-xl lg:text-2xl font-extrabold mt-1">
-              Sélectionnez votre mode
+        {/* Colonne 2 : Choix du jeu (Quiz / Petit Bac) */}
+        <div className="p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-5">
+          <div className="text-center space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+              Modes de jeu
+            </span>
+            <h2 className="text-xl font-semibold tracking-tight text-white">
+              Choisis ton jeu
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-4 flex-1">
             <button
               type="button"
               onClick={() => void handleSelectGame('quiz')}
-              className={`group rounded-3xl p-6 border-2 text-left flex flex-col items-center justify-center gap-4 transition-all ${
+              className={`tvos-card p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'quiz'
-                  ? 'bg-sky-500/15 border-sky-400 shadow-lg shadow-sky-950/60'
-                  : 'bg-slate-900 border-white/10 hover:border-white/30'
+                  ? 'bg-sky-400/20 border-sky-300 shadow-[0_14px_32px_-10px_rgba(56,189,248,0.5)]'
+                  : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <svg
-                viewBox="0 0 64 64"
-                className="w-16 h-16 text-sky-400"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="10" y="10" width="44" height="44" rx="12" />
-                <path d="M25 24.5a7 7 0 0 1 13.5 2.5c0 4.5-6.5 6-6.5 10.5" />
-                <circle cx="32" cy="44" r="2" fill="currentColor" stroke="none" />
-              </svg>
-
-              <div className="text-center">
-                <span className="block text-xl font-black text-white">Quiz</span>
-                <span className="block text-xs text-slate-300 mt-1">
-                  Questions rapides & points
-                </span>
+              <div className="w-14 h-14 rounded-[20px] bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_10px_24px_-6px_rgba(56,189,248,0.65)] ring-2 ring-white/75 flex items-center justify-center shrink-0">
+                <svg
+                  viewBox="0 0 48 48"
+                  fill="none"
+                  className="w-7 h-7 text-white"
+                  aria-hidden="true"
+                >
+                  <circle cx="24" cy="24" r="16" stroke="currentColor" strokeWidth="2.8" />
+                  <path
+                    d="M19.5 19a4.8 4.8 0 0 1 9.2 1.8c0 3.2-4.7 4.2-4.7 7.2"
+                    stroke="currentColor"
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="24" cy="33.5" r="1.7" fill="currentColor" />
+                </svg>
               </div>
 
-              <span
-                className={`text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full ${
-                  selectedGame === 'quiz'
-                    ? 'bg-sky-400 text-slate-950'
-                    : 'bg-white/10 text-slate-300'
-                }`}
-              >
-                {selectedGame === 'quiz' ? 'Sélectionné' : 'Choisir'}
-              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-lg font-semibold tracking-tight text-white">
+                    Quiz
+                  </h3>
+                  {selectedGame === 'quiz' && (
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] px-2.5 py-0.5 rounded-full bg-sky-300 text-slate-950">
+                      Actif
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Questions rapides et points en direct
+                </p>
+              </div>
             </button>
 
             <button
               type="button"
               onClick={() => void handleSelectGame('petit-bac')}
-              className={`group rounded-3xl p-6 border-2 text-left flex flex-col items-center justify-center gap-4 transition-all ${
+              className={`tvos-card p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'petit-bac'
-                  ? 'bg-amber-400/15 border-amber-300 shadow-lg shadow-amber-950/60'
-                  : 'bg-slate-900 border-white/10 hover:border-white/30'
+                  ? 'bg-indigo-400/20 border-cyan-300 shadow-[0_14px_32px_-10px_rgba(99,102,241,0.5)]'
+                  : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <svg
-                viewBox="0 0 64 64"
-                className="w-16 h-16 text-amber-300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="10" y="12" width="44" height="40" rx="10" />
-                <path d="M10 24h44" />
-                <path d="M26 24v28" />
-                <path d="M16 18h6" />
-                <path d="M32 34h16" />
-                <path d="M32 43h12" />
-              </svg>
-
-              <div className="text-center">
-                <span className="block text-xl font-black text-white">
-                  Petit Bac
-                </span>
-                <span className="block text-xs text-slate-300 mt-1">
-                  Lettres & catégories
-                </span>
+              <div className="w-14 h-14 rounded-[20px] bg-gradient-to-br from-indigo-400 to-cyan-500 shadow-[0_10px_24px_-6px_rgba(99,102,241,0.65)] ring-2 ring-white/75 flex items-center justify-center shrink-0">
+                <svg
+                  viewBox="0 0 48 48"
+                  fill="none"
+                  className="w-7 h-7 text-white"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12 13h24M24 13v22M13 38h22"
+                    stroke="currentColor"
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M32 23l5 5M37 23l-5 5"
+                    stroke="currentColor"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </div>
 
-              <span
-                className={`text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full ${
-                  selectedGame === 'petit-bac'
-                    ? 'bg-amber-300 text-slate-950'
-                    : 'bg-white/10 text-slate-300'
-                }`}
-              >
-                {selectedGame === 'petit-bac' ? 'Sélectionné' : 'Choisir'}
-              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-lg font-semibold tracking-tight text-white">
+                    Petit Bac
+                  </h3>
+                  {selectedGame === 'petit-bac' && (
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] px-2.5 py-0.5 rounded-full bg-cyan-300 text-slate-950">
+                      Actif
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Trouve les bons mots par lettre et thème
+                </p>
+              </div>
             </button>
           </div>
-        </section>
+        </div>
 
-        {/* Colonne 3 (Droite) : Joueurs connectés */}
-        <section className="rounded-3xl bg-slate-900/90 border border-white/10 p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-extrabold">Joueurs connectés</h2>
-            <span className="text-xs font-bold text-slate-400">
+        {/* Colonne 3 : Joueurs connectés */}
+        <div className="p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+                Salon
+              </span>
+              <h2 className="text-xl font-semibold tracking-tight text-white">
+                Joueurs connectés
+              </h2>
+            </div>
+            <span className="inline-flex items-center justify-center min-w-8 h-8 px-2.5 rounded-full text-xs font-semibold bg-white/[0.14] border border-white/20 text-white">
               {players.length}
             </span>
           </div>
 
           {players.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-center text-sm text-slate-400 px-3">
-              En attente de joueurs dans le salon…
+            <div className="flex-1 flex items-center justify-center text-center px-4 py-8">
+              <p className="text-sm text-slate-300">
+                Aucun joueur connecté pour l’instant. Scanne le QR code pour rejoindre.
+              </p>
             </div>
           ) : (
-            <ul className="space-y-2.5 overflow-y-auto pr-1">
-              {players.map((p) => {
+            <ul className="space-y-2.5 flex-1 overflow-y-auto pr-1">
+              {players.map((p, index) => {
                 const name = p.pseudo?.trim() || 'Joueur';
-                const color = p.avatar?.trim() || '#38bdf8';
+                const dotColor = resolvePlayerColor(p.avatar, index);
                 const score = typeof p.score === 'number' ? p.score : 0;
                 const answered = Boolean(p.answer && p.answer.trim().length > 0);
 
                 return (
                   <li
                     key={p.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950/80 border border-white/10 px-3.5 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950/55 border border-white/15 px-3.5 py-2.5"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span
-                        className="h-4 w-4 rounded-full shrink-0 ring-2 ring-white/25"
-                        style={{ backgroundColor: color }}
+                        className="h-4 w-4 rounded-full shrink-0 ring-2 ring-white/50"
+                        style={{ backgroundColor: dotColor }}
                         aria-hidden="true"
                       />
                       <div className="min-w-0">
-                        <p className="font-bold text-sm text-white truncate">
+                        <p className="font-semibold text-sm text-white truncate">
                           {name}
                         </p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-[11px] text-slate-300">
                           {answered ? 'Réponse envoyée' : 'Connecté'}
                         </p>
                       </div>
                     </div>
 
-                    <span className="rounded-xl bg-white/10 px-2.5 py-1 text-xs font-extrabold text-white shrink-0">
+                    <span className="rounded-xl bg-white/15 px-2.5 py-1 text-xs font-semibold text-white shrink-0">
                       {score} pts
                     </span>
                   </li>
@@ -617,8 +492,14 @@ export default function TvPage() {
               })}
             </ul>
           )}
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <footer className="relative z-10 max-w-7xl w-full mx-auto text-center mt-6">
+        <p className="text-xs tracking-wide text-slate-400">
+          Synchronisation temps réel • Salon multijoueur
+        </p>
+      </footer>
     </main>
   );
 }
