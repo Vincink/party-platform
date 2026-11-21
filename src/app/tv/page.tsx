@@ -955,7 +955,7 @@ export default function TVPage() {
   const isLastBacRound = bacRoundIndex >= bacRounds.length - 1
 
   return (
-    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-zinc-950 text-zinc-100 overflow-hidden select-none font-sans antialiased">
+    <main className="relative flex min-h-screen flex-col p-6 md:p-10 bg-[#050608] text-zinc-100 overflow-hidden select-none font-sans antialiased">
       <style>{`
         html, body {
           overflow: hidden;
@@ -980,25 +980,42 @@ export default function TVPage() {
           animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
           animation-fill-mode: both;
         }
+        .tv-tile {
+          transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+                      box-shadow 280ms cubic-bezier(0.22, 1, 0.36, 1),
+                      border-color 220ms ease,
+                      background-color 220ms ease;
+        }
+        .tv-tile:hover,
+        .tv-tile:focus-visible {
+          transform: scale(1.03);
+          box-shadow: 0 28px 65px -12px rgba(0, 0, 0, 0.85), 0 0 0 2px rgba(255, 255, 255, 0.45);
+          outline: none;
+        }
       `}</style>
 
-      <div className="max-w-6xl w-full mx-auto space-y-6 flex-1 flex flex-col">
-        <header className="flex items-center justify-between gap-4 bg-zinc-900/75 backdrop-blur-xl border border-white/10 px-6 py-3.5 rounded-2xl">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_55%_at_50%_-10%,rgba(56,189,248,0.14),rgba(5,6,8,0))]"
+      />
+
+      <div className="relative z-10 max-w-6xl w-full mx-auto space-y-6 flex-1 flex flex-col">
+        <header className="flex items-center justify-between gap-4 bg-white/[0.04] backdrop-blur-2xl border border-white/10 px-6 py-3.5 rounded-2xl">
           <div className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-sky-400" />
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">
-              {!entryModeSelected ? 'Accueil' : 'Mode TV • Hôte'}
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+              {!entryModeSelected ? 'Apple TV' : 'Mode TV • Hôte'}
             </span>
           </div>
 
           {!entryModeSelected ? (
-            <span className="text-sm font-medium text-zinc-300">
-              Choisir un mode d&apos;accès
+            <span className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+              Sélection d&apos;écran
             </span>
           ) : !gameOpened ? (
             <div className="flex items-center gap-2.5">
-              <span className="text-xs uppercase tracking-[0.12em] text-zinc-400 font-medium">
-                Code PIN
+              <span className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-medium">
+                PIN
               </span>
               <span className="text-xl font-semibold tracking-[0.22em] text-white tabular-nums">
                 {pin || '----'}
@@ -1016,7 +1033,7 @@ export default function TVPage() {
             className={`px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all cursor-pointer ${
               soundEnabled
                 ? 'bg-white/10 border-white/20 text-white hover:bg-white/15'
-                : 'bg-zinc-900 border-white/10 text-zinc-400 hover:text-zinc-200'
+                : 'bg-zinc-900/80 border-white/10 text-zinc-400 hover:text-zinc-200'
             }`}
           >
             {soundEnabled ? 'Audio actif' : 'Audio coupé'}
@@ -1030,65 +1047,68 @@ export default function TVPage() {
         )}
 
         {!entryModeSelected ? (
-          <div className="max-w-3xl w-full mx-auto my-auto space-y-6">
-            <section className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-8 md:p-10 rounded-3xl space-y-8">
-              <div className="text-center space-y-2">
-                <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
-                  Configuration
-                </p>
-                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white">
-                  Comment souhaitez-vous démarrer ?
-                </h1>
-              </div>
+          <div className="max-w-5xl w-full mx-auto my-auto space-y-10 py-4">
+            <div className="space-y-2 text-center md:text-left px-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-400">
+                Salon Multijoueur
+              </p>
+              <h1 className="text-4xl md:text-6xl font-semibold tracking-tight text-white">
+                Choisir un mode
+              </h1>
+              <p className="text-base md:text-lg text-zinc-400 max-w-2xl">
+                Lancez l&apos;affichage grand écran en tant qu&apos;hôte ou ouvrez la manette joueur sur cet appareil.
+              </p>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setEntryModeSelected(true)}
-                  className="p-6 rounded-2xl bg-zinc-950/70 hover:bg-zinc-800/70 border border-white/10 hover:border-sky-400/60 text-left flex flex-col justify-between gap-6 transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-[0.12em] font-semibold text-sky-300">
-                      Écran principal
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/5 border border-white/10 text-zinc-300">
-                      Hôte
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-2xl font-semibold tracking-tight text-white">
-                      Mode TV / Hôte
-                    </p>
-                    <p className="text-sm text-zinc-400">
-                      Créer un salon, afficher le code PIN et le QR code, animer la partie et suivre le classement.
-                    </p>
-                  </div>
-                </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
+              <button
+                type="button"
+                onClick={() => setEntryModeSelected(true)}
+                className="tv-tile group relative h-64 md:h-72 p-8 rounded-3xl bg-gradient-to-br from-zinc-800/80 via-zinc-900/85 to-[#0b0f17] border border-white/15 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold tracking-wide bg-sky-400/15 border border-sky-300/35 text-sky-200">
+                    Écran TV
+                  </span>
+                  <span className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400 group-hover:text-zinc-200 transition-colors">
+                    Hôte
+                  </span>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleGoToPlayer}
-                  className="p-6 rounded-2xl bg-zinc-950/70 hover:bg-zinc-800/70 border border-white/10 hover:border-white/30 text-left flex flex-col justify-between gap-6 transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-[0.12em] font-semibold text-zinc-300">
-                      Manette mobile
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/5 border border-white/10 text-zinc-300">
-                      Joueur
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-2xl font-semibold tracking-tight text-white">
-                      Rejoindre
-                    </p>
-                    <p className="text-sm text-zinc-400">
-                      Ouvrir l&apos;écran joueur pour saisir un code PIN, choisir un pseudo et répondre aux manches.
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </section>
+                <div className="space-y-2">
+                  <p className="text-3xl md:text-4xl font-semibold tracking-tight text-white">
+                    Mode TV / Hôte
+                  </p>
+                  <p className="text-sm md:text-base text-zinc-400 leading-relaxed">
+                    Générer un code PIN, afficher le QR code, piloter Quiz et Petit Bac et suivre le classement en direct.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGoToPlayer}
+                className="tv-tile group relative h-64 md:h-72 p-8 rounded-3xl bg-gradient-to-br from-zinc-800/70 via-zinc-900/85 to-[#090b10] border border-white/15 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold tracking-wide bg-white/10 border border-white/15 text-zinc-200">
+                    Manette
+                  </span>
+                  <span className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400 group-hover:text-zinc-200 transition-colors">
+                    Joueur
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-3xl md:text-4xl font-semibold tracking-tight text-white">
+                    Rejoindre
+                  </p>
+                  <p className="text-sm md:text-base text-zinc-400 leading-relaxed">
+                    Accéder directement à l&apos;écran joueur pour entrer un code PIN, choisir un pseudo et jouer.
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
         ) : !gameOpened ? (
           <div className="max-w-4xl w-full mx-auto my-auto space-y-6">
