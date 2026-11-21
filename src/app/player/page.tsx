@@ -28,7 +28,7 @@ interface Player {
   avatar?: string | null
 }
 
-const RANDOM_BADGE_COLORS = [
+const RANDOM_PLAYER_COLORS = [
   '#2563eb', // Bleu roi
   '#059669', // Vert émeraude
   '#d97706', // Ambre vif
@@ -43,12 +43,14 @@ const RANDOM_BADGE_COLORS = [
   '#0d9488', // Turquoise foncé
 ]
 
-function pickRandomBadgeColor(): string {
-  const idx = Math.floor(Math.random() * RANDOM_BADGE_COLORS.length)
-  return RANDOM_BADGE_COLORS[idx]
+function pickRandomPlayerColor(): string {
+  const idx = Math.floor(Math.random() * RANDOM_PLAYER_COLORS.length)
+  return RANDOM_PLAYER_COLORS[idx]
 }
 
-function resolvePlayerColor(player: Pick<Player, 'avatar' | 'id' | 'pseudo' | 'client_id'>): string {
+function resolvePlayerColor(
+  player: Pick<Player, 'avatar' | 'id' | 'pseudo' | 'client_id'>
+): string {
   if (player.avatar && player.avatar.startsWith('#')) {
     return player.avatar
   }
@@ -57,7 +59,7 @@ function resolvePlayerColor(player: Pick<Player, 'avatar' | 'id' | 'pseudo' | 'c
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   }
-  return RANDOM_BADGE_COLORS[hash % RANDOM_BADGE_COLORS.length]
+  return RANDOM_PLAYER_COLORS[hash % RANDOM_PLAYER_COLORS.length]
 }
 
 function getOrCreateClientId(): string {
@@ -179,7 +181,7 @@ function PlayerContent() {
     }
 
     const clientId = getOrCreateClientId()
-    const assignedColor = pickRandomBadgeColor()
+    const assignedColor = pickRandomPlayerColor()
 
     const { data: createdPlayer, error: playerError } = await supabase
       .from('players')
@@ -207,10 +209,10 @@ function PlayerContent() {
     setJoining(false)
   }
 
-  const badgeColor = player ? resolvePlayerColor(player) : RANDOM_BADGE_COLORS[0]
+  const playerColor = player ? resolvePlayerColor(player) : RANDOM_PLAYER_COLORS[0]
 
   return (
-    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-5 py-6 sm:px-8 sm:py-8">
+    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex items-center justify-center px-5 py-6 sm:px-8 sm:py-8">
       <style>{`
         html, body {
           height: 100%;
@@ -248,19 +250,7 @@ function PlayerContent() {
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
       />
 
-      <header className="relative z-10 flex items-center justify-between max-w-xl w-full mx-auto gap-3 shrink-0">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
-          tvOS • Joueur
-        </span>
-
-        {room?.room_code && (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] bg-white/[0.14] border border-white/25 text-white backdrop-blur-xl">
-            {room.room_code}
-          </span>
-        )}
-      </header>
-
-      <section className="relative z-10 max-w-xl w-full mx-auto my-auto flex-1 flex items-center justify-center">
+      <section className="relative z-10 max-w-xl w-full mx-auto flex items-center justify-center">
         {!player || !room ? (
           <form
             onSubmit={handleJoinRoom}
@@ -334,36 +324,21 @@ function PlayerContent() {
           </form>
         ) : room.status === 'playing' ? (
           <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-6">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
-                {room.game_type === 'petit_bac' ? 'Petit Bac' : 'Quiz'}
-              </span>
-              <span
-                style={{ backgroundColor: badgeColor }}
-                className="px-4 py-1.5 rounded-full text-xs font-semibold text-white border border-white/40 shadow-md"
-              >
-                En cours
-              </span>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white/[0.07] border border-white/15 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <span
-                  style={{ backgroundColor: badgeColor }}
-                  className="w-6 h-6 rounded-full border-2 border-white shrink-0 shadow-sm"
-                />
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[0.15em] text-slate-300">
-                    Joueur
-                  </p>
-                  <p className="text-xl font-semibold text-white truncate">{player.pseudo}</p>
-                </div>
+            <div
+              style={{ backgroundColor: playerColor }}
+              className="p-5 rounded-2xl border-2 border-white/50 flex items-center justify-between gap-4 shadow-lg"
+            >
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.15em] text-white/85 font-semibold">
+                  {room.game_type === 'petit_bac' ? 'Petit Bac' : 'Quiz'} • {room.room_code}
+                </p>
+                <p className="text-2xl font-bold text-white truncate">{player.pseudo}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs uppercase tracking-[0.15em] text-slate-300">
+                <p className="text-xs uppercase tracking-[0.15em] text-white/85 font-semibold">
                   Score
                 </p>
-                <p className="text-2xl font-semibold text-sky-300">{player.score} pts</p>
+                <p className="text-2xl font-bold text-white">{player.score} pts</p>
               </div>
             </div>
 
@@ -380,23 +355,16 @@ function PlayerContent() {
           </div>
         ) : (
           <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 text-center space-y-6">
-            <div className="space-y-2 flex flex-col items-center">
-              <span
-                style={{ backgroundColor: badgeColor }}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em] text-white border border-white/40 shadow-md"
-              >
-                <span className="w-2.5 h-2.5 rounded-full bg-white" />
-                Connecté
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white pt-1">
+            <div
+              style={{ backgroundColor: playerColor }}
+              className="w-full py-6 px-5 rounded-[24px] border-2 border-white/50 shadow-lg space-y-1.5"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/90">
+                Salon {room.room_code}
+              </p>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
                 {player.pseudo}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300">
-                Salon{' '}
-                <span className="font-semibold text-white tracking-widest">
-                  {room.room_code}
-                </span>
-              </p>
             </div>
 
             <div className="py-6 px-4 rounded-2xl bg-white/[0.06] border border-white/15 space-y-1.5">
@@ -410,12 +378,6 @@ function PlayerContent() {
           </div>
         )}
       </section>
-
-      <footer className="relative z-10 max-w-xl w-full mx-auto text-center shrink-0">
-        <p className="text-xs tracking-wide text-slate-400">
-          Manette joueur • Synchronisation temps réel
-        </p>
-      </footer>
     </main>
   )
 }
