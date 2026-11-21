@@ -9,9 +9,11 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface Player {
-  id: string
-  name: string
+  id: string | number
+  room_code: string
+  pseudo: string
   score: number
+  is_connected?: boolean | null
 }
 
 interface Room {
@@ -184,24 +186,34 @@ export default function TvPage() {
   }, [createRoom])
 
   useEffect(() => {
-    if (!room?.id) return
+    if (!room?.room_code) return
+
+    const cleanRoomCode = String(room.room_code).trim().toUpperCase()
 
     const fetchPlayers = async () => {
       const { data } = await supabase
         .from('players')
         .select('*')
-        .eq('room_id', room.id)
+        .ilike('room_code', cleanRoomCode)
         .order('score', { ascending: false })
-      if (data) setPlayers(data)
+      if (data) {
+        const activePlayers = data.filter((p) => p.is_connected !== false)
+        setPlayers(activePlayers)
+      }
     }
 
     fetchPlayers()
 
     const channel = supabase
-      .channel(`room-${room.id}`)
+      .channel(`room-sync-${cleanRoomCode}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `room_code=eq.${cleanRoomCode}`,
+        },
         () => {
           fetchPlayers()
         }
@@ -218,7 +230,7 @@ export default function TvPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [room?.id])
+  }, [room?.id, room?.room_code])
 
   const handleStartGame = async () => {
     if (!room?.id) return
@@ -228,7 +240,7 @@ export default function TvPage() {
       setCurrentLetter(letters[Math.floor(Math.random() * letters.length)])
       setCurrentQuestion(null)
     } else {
-      setCurrentQuestion('Question 1 : Pret pour commencer ?')
+      setCurrentQuestion('Question 1 : Prêt pour commencer ?')
       setCurrentLetter(null)
     }
 
@@ -263,7 +275,7 @@ export default function TvPage() {
 
   const joinUrl =
     typeof window !== 'undefined' && room?.room_code
-      ? `${window.location.origin}/player?code=${room.room_code}`
+      ? `${window.location.origin}/player?code=${encodeURIComponent(room.room_code)}`
       : ''
 
   const qrCodeSrc = joinUrl
@@ -358,10 +370,10 @@ export default function TvPage() {
         {loading ? (
           <div className="w-full flex flex-col items-center justify-center text-center space-y-3">
             <p className="text-2xl font-semibold tracking-tight text-white">
-              Creation du salon...
+              Création du salon...
             </p>
             <p className="text-sm text-slate-300">
-              Connexion en temps reel au serveur
+              Connexion en temps réel au serveur
             </p>
           </div>
         ) : errorMsg ? (
@@ -373,7 +385,7 @@ export default function TvPage() {
               onClick={createRoom}
               className="tvos-btn px-6 py-3 rounded-2xl bg-sky-500 text-white font-semibold text-sm cursor-pointer"
             >
-              Reessayer
+              Réessayer
             </button>
           </div>
         ) : room?.status === 'playing' ? (
@@ -392,7 +404,7 @@ export default function TvPage() {
                 {activeGameType === 'petit_bac' ? (
                   <>
                     <p className="text-sm uppercase tracking-[0.18em] text-sky-200 font-semibold">
-                      Lettre tiree
+                      Lettre tirée
                     </p>
                     <p className="text-7xl md:text-8xl font-semibold tracking-tight text-white">
                       {currentLetter || 'A'}
@@ -428,7 +440,7 @@ export default function TvPage() {
                 </div>
 
                 {players.length === 0 ? (
-                  <p className="text-sm text-slate-300">Aucun joueur connecte.</p>
+                  <p className="text-sm text-slate-300">Aucun joueur connecté.</p>
                 ) : (
                   <ul className="space-y-2.5">
                     {players.map((p) => (
@@ -436,7 +448,7 @@ export default function TvPage() {
                         key={p.id}
                         className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/[0.08] border border-white/15"
                       >
-                        <span className="font-medium text-white">{p.name}</span>
+                        <span className="font-medium text-white">{p.pseudo}</span>
                         <span className="font-semibold text-sky-300">{p.score} pts</span>
                       </li>
                     ))}
@@ -505,7 +517,7 @@ export default function TvPage() {
                       Quiz
                     </p>
                     <p className="text-[11px] leading-snug text-slate-200">
-                      Culture & musique
+                      Culture &amp; musique
                     </p>
                   </div>
                 </button>
@@ -525,7 +537,7 @@ export default function TvPage() {
                       Petit Bac
                     </p>
                     <p className="text-[11px] leading-snug text-slate-200">
-                      Mots & catégories
+                      Mots &amp; catégories
                     </p>
                   </div>
                 </button>
@@ -578,7 +590,7 @@ export default function TvPage() {
                             {idx + 1}
                           </span>
                           <span className="col-span-7 font-semibold text-white truncate pr-2">
-                            {p.name}
+                            {p.pseudo}
                           </span>
                           <span className="col-span-3 text-right">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-400/20 border border-emerald-300/30 text-emerald-200">
