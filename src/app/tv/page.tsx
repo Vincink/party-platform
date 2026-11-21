@@ -36,11 +36,35 @@ interface RawQuestion {
   title?: string
   text?: string
   intitule?: string
-  options?: string[]
-  choices?: string[]
-  answers?: string[]
-  propositions?: string[]
-  reponses?: string[]
+  options?: unknown[]
+  choices?: unknown[]
+  answers?: unknown[]
+  propositions?: unknown[]
+  reponses?: unknown[]
+  a?: string
+  b?: string
+  c?: string
+  d?: string
+  A?: string
+  B?: string
+  C?: string
+  D?: string
+  optionA?: string
+  optionB?: string
+  optionC?: string
+  optionD?: string
+  option1?: string
+  option2?: string
+  option3?: string
+  option4?: string
+  choice1?: string
+  choice2?: string
+  choice3?: string
+  choice4?: string
+  reponse1?: string
+  reponse2?: string
+  reponse3?: string
+  reponse4?: string
   category?: string
   categorie?: string
   theme?: string
@@ -49,7 +73,7 @@ interface RawQuestion {
 interface NormalizedQuestion {
   id: string | number
   question: string
-  options: string[]
+  options: [string, string, string, string]
   category?: string
 }
 
@@ -80,6 +104,53 @@ function resolvePlayerColor(player: Player, index: number): string {
   return RANDOM_PLAYER_COLORS[(hash + index) % RANDOM_PLAYER_COLORS.length]
 }
 
+function extractOptionText(entry: unknown): string {
+  if (typeof entry === 'string' || typeof entry === 'number') {
+    return String(entry).trim()
+  }
+  if (entry && typeof entry === 'object') {
+    const obj = entry as Record<string, unknown>
+    const val = obj.text ?? obj.label ?? obj.value ?? obj.title ?? obj.reponse ?? obj.option
+    if (val !== undefined && val !== null) {
+      return String(val).trim()
+    }
+  }
+  return ''
+}
+
+function extractFourOptions(item: RawQuestion): string[] {
+  const arraySource =
+    item?.options ??
+    item?.choices ??
+    item?.answers ??
+    item?.propositions ??
+    item?.reponses
+
+  if (Array.isArray(arraySource) && arraySource.length > 0) {
+    return arraySource.map(extractOptionText).filter((s) => s.length > 0).slice(0, 4)
+  }
+
+  const discreteCandidates = [
+    [item?.a, item?.b, item?.c, item?.d],
+    [item?.A, item?.B, item?.C, item?.D],
+    [item?.optionA, item?.optionB, item?.optionC, item?.optionD],
+    [item?.option1, item?.option2, item?.option3, item?.option4],
+    [item?.choice1, item?.choice2, item?.choice3, item?.choice4],
+    [item?.reponse1, item?.reponse2, item?.reponse3, item?.reponse4],
+  ]
+
+  for (const group of discreteCandidates) {
+    const cleaned = group
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      .map((v) => v.trim())
+    if (cleaned.length > 0) {
+      return cleaned.slice(0, 4)
+    }
+  }
+
+  return []
+}
+
 function extractQuestionPool(): NormalizedQuestion[] {
   const mod = questionsModule as Record<string, unknown>
   const candidates: unknown[] = [
@@ -106,19 +177,19 @@ function extractQuestionPool(): NormalizedQuestion[] {
         item?.title ??
         item?.text ??
         ''
-      const opts =
-        item?.options ??
-        item?.choices ??
-        item?.answers ??
-        item?.propositions ??
-        item?.reponses ??
-        []
+      const rawOpts = extractFourOptions(item)
+      const fourOptions: [string, string, string, string] = [
+        rawOpts[0] ?? 'Réponse A',
+        rawOpts[1] ?? 'Réponse B',
+        rawOpts[2] ?? 'Réponse C',
+        rawOpts[3] ?? 'Réponse D',
+      ]
       const cat = item?.category ?? item?.categorie ?? item?.theme
 
       return {
         id: item?.id ?? idx,
         question: String(text).trim(),
-        options: Array.isArray(opts) ? opts.map((o) => String(o)) : [],
+        options: fourOptions,
         category: cat ? String(cat) : undefined,
       }
     })
@@ -426,21 +497,6 @@ export default function TvPage() {
           overscroll-behavior: none;
           font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
         }
-        .tvos-card {
-          transition:
-            transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
-            box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1),
-            border-color 240ms ease,
-            background 240ms ease;
-        }
-        .tvos-card:hover,
-        .tvos-card:focus-visible {
-          transform: scale(1.015) translateY(-2px);
-          box-shadow:
-            0 28px 65px -12px rgba(2, 6, 23, 0.75),
-            0 0 0 2px rgba(255, 255, 255, 0.65);
-          outline: none;
-        }
         .tvos-tile {
           transition:
             transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -524,7 +580,7 @@ export default function TvPage() {
           </div>
         ) : room?.status === 'playing' ? (
           <div className="w-full h-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            <div className="tvos-card lg:col-span-8 h-full p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0">
+            <div className="lg:col-span-8 h-full p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0">
               <div className="flex items-center justify-between gap-3 shrink-0">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
                   {activeGameType === 'petit_bac'
@@ -549,24 +605,16 @@ export default function TvPage() {
                     </p>
                   </>
                 ) : !quizStarted ? (
-                  <div className="space-y-4 max-w-2xl">
+                  <div className="space-y-2 max-w-2xl">
                     <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-white leading-tight">
                       Prêt pour le Quiz ?
                     </h1>
-                    <p className="text-sm md:text-base text-slate-300">
-                      {questionPool.length > 0
-                        ? `${questionPool.length} questions chargées depuis src/data/questions.ts.`
-                        : 'Aucune question trouvée dans src/data/questions.ts.'}
-                    </p>
                   </div>
                 ) : !activeQuestion ? (
                   <div className="space-y-2">
                     <h1 className="text-3xl md:text-4xl font-semibold text-white">
                       Aucune question disponible
                     </h1>
-                    <p className="text-sm text-slate-300">
-                      Vérifie l&apos;export de ton fichier src/data/questions.ts.
-                    </p>
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -574,23 +622,21 @@ export default function TvPage() {
                       {activeQuestion.question}
                     </h1>
 
-                    {activeQuestion.options.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                        {activeQuestion.options.map((opt, i) => (
-                          <div
-                            key={`${activeQuestion.id}-${i}`}
-                            className="px-4 py-3.5 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center gap-3"
-                          >
-                            <span className="w-7 h-7 rounded-xl bg-sky-500/30 border border-sky-300/40 text-sky-200 text-xs font-bold flex items-center justify-center shrink-0">
-                              {String.fromCharCode(65 + i)}
-                            </span>
-                            <span className="text-sm md:text-base font-medium text-white">
-                              {opt}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pointer-events-none">
+                      {activeQuestion.options.map((opt, i) => (
+                        <div
+                          key={`${activeQuestion.id}-${i}`}
+                          className="px-4 py-3.5 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center gap-3"
+                        >
+                          <span className="w-8 h-8 rounded-xl bg-sky-500/30 border border-sky-300/40 text-sky-200 text-sm font-bold flex items-center justify-center shrink-0">
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span className="text-base md:text-lg font-medium text-white">
+                            {opt}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -629,7 +675,7 @@ export default function TvPage() {
               </div>
             </div>
 
-            <div className="tvos-card lg:col-span-4 h-full p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-5 min-h-0">
+            <div className="lg:col-span-4 h-full p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-5 min-h-0 pointer-events-none">
               <div className="space-y-4 flex-1 min-h-0 flex flex-col">
                 <div className="flex items-center justify-between shrink-0">
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
