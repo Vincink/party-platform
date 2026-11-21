@@ -233,7 +233,7 @@ function extractOptionsAndCorrect(item: RawQuestion): {
 
     for (const group of discreteCandidates) {
       const cleaned = group
-        .filter((v): v is string | number => v !== undefined && v !== null && String(v).trim().length > 0)
+        .filter((v) => v !== undefined && v !== null && String(v).trim().length > 0)
         .map((v) => String(v).trim())
       if (cleaned.length > 0) {
         texts = cleaned.slice(0, 4)
