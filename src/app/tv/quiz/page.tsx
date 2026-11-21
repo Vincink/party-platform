@@ -466,6 +466,7 @@ export default function TvQuizPage() {
               {OPTION_LETTERS.map((letter) => {
                 const colorStyle = OPTION_STYLES[letter];
                 const optionText = currentQuestion.options[letter];
+                const isLongOption = optionText.length > 22;
                 const isCorrect = isTimeOver && letter === currentQuestion.correct;
                 const isDimmed = isTimeOver && letter !== currentQuestion.correct;
 
@@ -477,7 +478,7 @@ export default function TvQuizPage() {
                       borderColor: isCorrect ? '#ffffff' : colorStyle.border,
                       opacity: isDimmed ? 0.45 : 1,
                     }}
-                    className={`h-28 sm:h-32 rounded-[24px] border-2 px-5 flex items-center justify-between gap-3 transition-all duration-300 ${
+                    className={`h-28 sm:h-32 rounded-[24px] border-2 px-4 sm:px-5 flex items-center justify-between gap-3 transition-all duration-300 ${
                       isCorrect
                         ? 'ring-4 ring-white shadow-[0_16px_36px_-6px_rgba(255,255,255,0.55)] scale-[1.02]'
                         : 'shadow-md'
@@ -490,7 +491,11 @@ export default function TvQuizPage() {
                       {letter}
                     </span>
 
-                    <span className="flex-1 text-center text-3xl sm:text-4xl font-bold text-white truncate">
+                    <span
+                      className={`flex-1 text-center font-bold text-white leading-tight line-clamp-2 ${
+                        isLongOption ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl'
+                      }`}
+                    >
                       {optionText}
                     </span>
 
@@ -500,21 +505,12 @@ export default function TvQuizPage() {
               })}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pt-2">
-              <button
-                type="button"
-                disabled={timeLeft > 0}
-                onClick={() => void syncQuestionIndex(questionIndex - 1)}
-                className="px-4 py-3 rounded-2xl bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-sm font-semibold text-white cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Précédente
-              </button>
-
+            <div className="flex items-center justify-end shrink-0 pt-2">
               <button
                 type="button"
                 disabled={timeLeft > 0}
                 onClick={() => void syncQuestionIndex(questionIndex + 1)}
-                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-sm font-bold cursor-pointer transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-base font-bold cursor-pointer transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Question suivante
               </button>
