@@ -26,6 +26,29 @@ interface Room {
   config?: Record<string, unknown> | null
 }
 
+const PLAYER_BADGE_STYLES = [
+  'bg-sky-400/25 border-sky-300/45 text-sky-100',
+  'bg-emerald-400/25 border-emerald-300/45 text-emerald-100',
+  'bg-amber-400/25 border-amber-300/45 text-amber-100',
+  'bg-violet-400/25 border-violet-300/45 text-violet-100',
+  'bg-rose-400/25 border-rose-300/45 text-rose-100',
+  'bg-cyan-400/25 border-cyan-300/45 text-cyan-100',
+  'bg-fuchsia-400/25 border-fuchsia-300/45 text-fuchsia-100',
+  'bg-orange-400/25 border-orange-300/45 text-orange-100',
+  'bg-teal-400/25 border-teal-300/45 text-teal-100',
+  'bg-lime-400/25 border-lime-300/45 text-lime-100',
+]
+
+function getPlayerBadgeClass(player: Player, index: number): string {
+  const seed = String(player.id ?? player.pseudo ?? index)
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+  }
+  const paletteIndex = (index + hash) % PLAYER_BADGE_STYLES.length
+  return PLAYER_BADGE_STYLES[paletteIndex]
+}
+
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let code = ''
@@ -443,12 +466,22 @@ export default function TvPage() {
                   <p className="text-sm text-slate-300">Aucun joueur connecté.</p>
                 ) : (
                   <ul className="space-y-2.5">
-                    {players.map((p) => (
+                    {players.map((p, idx) => (
                       <li
                         key={p.id}
                         className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/[0.08] border border-white/15"
                       >
-                        <span className="font-medium text-white">{p.pseudo}</span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getPlayerBadgeClass(
+                              p,
+                              idx
+                            )}`}
+                          >
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium text-white truncate">{p.pseudo}</span>
+                        </div>
                         <span className="font-semibold text-sky-300">{p.score} pts</span>
                       </li>
                     ))}
@@ -581,24 +614,33 @@ export default function TvPage() {
                       <span className="col-span-3 text-right">Statut</span>
                     </div>
                     <ul className="divide-y divide-white/10">
-                      {players.map((p, idx) => (
-                        <li
-                          key={p.id}
-                          className="grid grid-cols-12 items-center px-4 py-3 text-sm"
-                        >
-                          <span className="col-span-2 font-semibold text-slate-400">
-                            {idx + 1}
-                          </span>
-                          <span className="col-span-7 font-semibold text-white truncate pr-2">
-                            {p.pseudo}
-                          </span>
-                          <span className="col-span-3 text-right">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-400/20 border border-emerald-300/30 text-emerald-200">
-                              Prêt
+                      {players.map((p, idx) => {
+                        const badgeClass = getPlayerBadgeClass(p, idx)
+                        return (
+                          <li
+                            key={p.id}
+                            className="grid grid-cols-12 items-center px-4 py-3 text-sm"
+                          >
+                            <span className="col-span-2">
+                              <span
+                                className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold border ${badgeClass}`}
+                              >
+                                {idx + 1}
+                              </span>
                             </span>
-                          </span>
-                        </li>
-                      ))}
+                            <span className="col-span-7 font-semibold text-white truncate pr-2">
+                              {p.pseudo}
+                            </span>
+                            <span className="col-span-3 text-right">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badgeClass}`}
+                              >
+                                Prêt
+                              </span>
+                            </span>
+                          </li>
+                        )
+                      })}
                     </ul>
                   </div>
                 )}
