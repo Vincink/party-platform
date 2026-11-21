@@ -154,6 +154,7 @@ export default function TvPage() {
   const [selectedGame, setSelectedGame] = useState<GameMode>('quiz');
   const [originUrl, setOriginUrl] = useState<string>('');
   const [qrError, setQrError] = useState<boolean>(false);
+  const [isLaunching, setIsLaunching] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -311,6 +312,38 @@ export default function TvPage() {
       .eq('room_code', activeCode);
   };
 
+  const handleStartGame = async () => {
+    const activeCode = room?.room_code || roomCode;
+    if (!activeCode || isLaunching) return;
+
+    setIsLaunching(true);
+    try {
+      const currentCfg = parseConfig(room?.config);
+      const nextCfg: RoomConfig = {
+        ...currentCfg,
+        game_mode: selectedGame,
+        question_index: 0,
+      };
+
+      const { data } = await supabase
+        .from('rooms')
+        .update({ status: 'playing', config: nextCfg })
+        .eq('room_code', activeCode)
+        .select('id, room_code, status, config')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setRoom(data as RoomRow);
+      } else {
+        setRoom((prev) => (prev ? { ...prev, status: 'playing', config: nextCfg } : prev));
+      }
+    } finally {
+      setIsLaunching(false);
+    }
+  };
+
   const activeRoomCode = room?.room_code || roomCode || 'SALON';
   const joinUrl = originUrl
     ? `${originUrl}/player?code=${encodeURIComponent(activeRoomCode)}`
@@ -320,7 +353,7 @@ export default function TvPage() {
     setQrError(false);
   }, [joinUrl]);
 
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${encodeURIComponent(
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=460x460&margin=12&data=${encodeURIComponent(
     joinUrl
   )}`;
 
@@ -371,31 +404,35 @@ export default function TvPage() {
       </header>
 
       <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        {/* Colonne 1 : QR Code */}
-        <div className="tvos-card h-full p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-center text-center gap-4">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
-            Connexion rapide
-          </span>
-          <h2 className="text-xl font-semibold tracking-tight text-white">
-            Scanne le QR code
-          </h2>
+        {/* Colonne 1 : QR Code agrandi au maximum de la colonne */}
+        <div className="tvos-card h-full min-h-0 p-5 md:p-6 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-between text-center gap-3">
+          <div className="shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+              Connexion rapide
+            </span>
+            <h2 className="text-xl font-semibold tracking-tight text-white">
+              Scanne le QR code
+            </h2>
+          </div>
 
-          {!qrError ? (
-            <div className="p-3 rounded-2xl bg-white shadow-[0_14px_30px_-8px_rgba(2,6,23,0.75)]">
-              <img
-                src={qrSrc}
-                alt={`QR code pour rejoindre le salon ${activeRoomCode}`}
-                className="w-40 h-40 sm:w-44 sm:h-44 block rounded-lg"
-                onError={() => setQrError(true)}
-              />
-            </div>
-          ) : (
-            <div className="w-44 h-44 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center p-4 text-xs text-slate-300">
-              Code salon : {activeRoomCode}
-            </div>
-          )}
+          <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+            {!qrError ? (
+              <div className="h-full max-h-[340px] aspect-square p-3 rounded-3xl bg-white shadow-[0_14px_30px_-8px_rgba(2,6,23,0.75)] flex items-center justify-center">
+                <img
+                  src={qrSrc}
+                  alt={`QR code pour rejoindre le salon ${activeRoomCode}`}
+                  className="w-full h-full object-contain block rounded-xl"
+                  onError={() => setQrError(true)}
+                />
+              </div>
+            ) : (
+              <div className="h-full max-h-[340px] aspect-square rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center p-4 text-sm text-slate-300">
+                Code salon : {activeRoomCode}
+              </div>
+            )}
+          </div>
 
-          <div className="space-y-1">
+          <div className="shrink-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
               Code du salon
             </p>
@@ -405,9 +442,9 @@ export default function TvPage() {
           </div>
         </div>
 
-        {/* Colonne 2 : Choix du jeu (Quiz / Petit Bac) */}
-        <div className="h-full p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-5">
-          <div className="text-center space-y-1 shrink-0">
+        {/* Colonne 2 : Choix du jeu (icônes SVG simples) + bouton Lancer le jeu */}
+        <div className="h-full min-h-0 p-5 md:p-6 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
+          <div className="text-center shrink-0">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
               Modes de jeu
             </span>
@@ -416,37 +453,35 @@ export default function TvPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 gap-3.5 flex-1 min-h-0">
             <button
               type="button"
               onClick={() => void handleSelectGame('quiz')}
-              className={`tvos-card h-full p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
+              className={`tvos-card h-full px-5 py-4 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'quiz'
                   ? 'bg-sky-400/20 border-sky-300 shadow-[0_14px_32px_-10px_rgba(56,189,248,0.5)]'
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <div className="w-14 h-14 rounded-[20px] bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_10px_24px_-6px_rgba(56,189,248,0.65)] ring-2 ring-white/75 flex items-center justify-center shrink-0">
-                <svg
-                  viewBox="0 0 48 48"
-                  fill="none"
-                  className="w-7 h-7 text-white"
-                  aria-hidden="true"
-                >
-                  <circle cx="24" cy="24" r="16" stroke="currentColor" strokeWidth="2.8" />
-                  <path
-                    d="M19.5 19a4.8 4.8 0 0 1 9.2 1.8c0 3.2-4.7 4.2-4.7 7.2"
-                    stroke="currentColor"
-                    strokeWidth="2.8"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="24" cy="33.5" r="1.7" fill="currentColor" />
-                </svg>
-              </div>
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                className="w-11 h-11 text-sky-300 shrink-0"
+                aria-hidden="true"
+              >
+                <circle cx="24" cy="24" r="17" stroke="currentColor" strokeWidth="2.8" />
+                <path
+                  d="M19.2 18.8a5 5 0 0 1 9.6 1.8c0 3.3-4.8 4.4-4.8 7.6"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
+                <circle cx="24" cy="34.2" r="1.8" fill="currentColor" />
+              </svg>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-lg font-semibold tracking-tight text-white">
+                  <h3 className="text-xl font-semibold tracking-tight text-white">
                     Quiz
                   </h3>
                   {selectedGame === 'quiz' && (
@@ -464,38 +499,36 @@ export default function TvPage() {
             <button
               type="button"
               onClick={() => void handleSelectGame('petit-bac')}
-              className={`tvos-card h-full p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
+              className={`tvos-card h-full px-5 py-4 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'petit-bac'
                   ? 'bg-indigo-400/20 border-cyan-300 shadow-[0_14px_32px_-10px_rgba(99,102,241,0.5)]'
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <div className="w-14 h-14 rounded-[20px] bg-gradient-to-br from-indigo-400 to-cyan-500 shadow-[0_10px_24px_-6px_rgba(99,102,241,0.65)] ring-2 ring-white/75 flex items-center justify-center shrink-0">
-                <svg
-                  viewBox="0 0 48 48"
-                  fill="none"
-                  className="w-7 h-7 text-white"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M12 13h24M24 13v22M13 38h22"
-                    stroke="currentColor"
-                    strokeWidth="2.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M32 23l5 5M37 23l-5 5"
-                    stroke="currentColor"
-                    strokeWidth="2.6"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                className="w-11 h-11 text-cyan-300 shrink-0"
+                aria-hidden="true"
+              >
+                <path
+                  d="M11 12h26M24 12v23M12 39h24"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M32 22l5.5 5.5M37.5 22L32 27.5"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                />
+              </svg>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-lg font-semibold tracking-tight text-white">
+                  <h3 className="text-xl font-semibold tracking-tight text-white">
                     Petit Bac
                   </h3>
                   {selectedGame === 'petit-bac' && (
@@ -510,10 +543,23 @@ export default function TvPage() {
               </div>
             </button>
           </div>
+
+          <button
+            type="button"
+            disabled={isLaunching}
+            onClick={() => void handleStartGame()}
+            className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 font-semibold text-base tracking-wide shadow-[0_12px_28px_-8px_rgba(56,189,248,0.65)] hover:brightness-105 active:scale-[0.99] transition cursor-pointer shrink-0 disabled:opacity-60"
+          >
+            {isLaunching
+              ? 'Lancement...'
+              : room?.status === 'playing'
+                ? `Partie en cours (${selectedGame === 'quiz' ? 'Quiz' : 'Petit Bac'})`
+                : `Lancer le jeu (${selectedGame === 'quiz' ? 'Quiz' : 'Petit Bac'})`}
+          </button>
         </div>
 
         {/* Colonne 3 : Joueurs connectés */}
-        <div className="h-full min-h-0 p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
+        <div className="h-full min-h-0 p-5 md:p-6 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
           <div className="flex items-center justify-between gap-2 shrink-0">
             <div>
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
@@ -535,12 +581,11 @@ export default function TvPage() {
               </p>
             </div>
           ) : (
-            <ul className="space-y-2.5 flex-1 min-h-0 overflow-y-auto pr-1">
-              {players.map((p) => {
+            <ul className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
+              {players.map((p, index) => {
                 const name = p.pseudo?.trim() || 'Joueur';
                 const palette = getUniquePlayerPalette(p, usedPaletteIndices);
                 const score = typeof p.score === 'number' ? p.score : 0;
-                const answered = Boolean(p.answer && p.answer.trim().length > 0);
 
                 return (
                   <li
@@ -550,14 +595,23 @@ export default function TvPage() {
                       borderColor: palette.border,
                       color: palette.text,
                     }}
-                    className="flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 shadow-md"
+                    className="flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3.5 shadow-md"
                   >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate" style={{ color: palette.text }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        style={{
+                          backgroundColor: palette.badgeBg,
+                          color: palette.badgeText,
+                        }}
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-bold shrink-0"
+                      >
+                        {index + 1}
+                      </span>
+                      <p
+                        className="font-bold text-xl truncate"
+                        style={{ color: palette.text }}
+                      >
                         {name}
-                      </p>
-                      <p className="text-[11px] font-medium" style={{ color: palette.subtext }}>
-                        {answered ? 'Réponse envoyée' : 'Connecté'}
                       </p>
                     </div>
 
@@ -566,7 +620,7 @@ export default function TvPage() {
                         backgroundColor: palette.badgeBg,
                         color: palette.badgeText,
                       }}
-                      className="rounded-xl px-2.5 py-1 text-xs font-semibold shrink-0"
+                      className="rounded-xl px-3.5 py-1.5 text-lg font-extrabold shrink-0"
                     >
                       {score} pts
                     </span>
