@@ -77,6 +77,50 @@ interface NormalizedQuestion {
   category?: string
 }
 
+interface AnswerTileStyle {
+  letter: 'A' | 'B' | 'C' | 'D'
+  bg: string
+  border: string
+  badgeBg: string
+  badgeText: string
+  text: string
+}
+
+const ANSWER_TILE_STYLES: [AnswerTileStyle, AnswerTileStyle, AnswerTileStyle, AnswerTileStyle] = [
+  {
+    letter: 'A',
+    bg: '#dc2626',
+    border: '#fca5a5',
+    badgeBg: 'rgba(15, 23, 42, 0.28)',
+    badgeText: '#ffffff',
+    text: '#ffffff',
+  },
+  {
+    letter: 'B',
+    bg: '#eab308',
+    border: '#fef08a',
+    badgeBg: 'rgba(15, 23, 42, 0.16)',
+    badgeText: '#0f172a',
+    text: '#0f172a',
+  },
+  {
+    letter: 'C',
+    bg: '#2563eb',
+    border: '#93c5fd',
+    badgeBg: 'rgba(15, 23, 42, 0.28)',
+    badgeText: '#ffffff',
+    text: '#ffffff',
+  },
+  {
+    letter: 'D',
+    bg: '#16a34a',
+    border: '#86efac',
+    badgeBg: 'rgba(15, 23, 42, 0.28)',
+    badgeText: '#ffffff',
+    text: '#ffffff',
+  },
+]
+
 const RANDOM_PLAYER_COLORS = [
   '#2563eb', // Bleu roi
   '#059669', // Vert émeraude
@@ -540,20 +584,13 @@ export default function TvPage() {
           tvOS • Mode Hôte
         </span>
 
-        <div className="flex items-center gap-3">
-          {room?.room_code && (
-            <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.18em] bg-white/[0.14] border border-white/25 text-white backdrop-blur-xl">
-              Code : {room.room_code}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="tvos-btn inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.11] border border-white/25 text-sky-100 backdrop-blur-xl cursor-pointer"
-          >
-            Accueil
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/')}
+          className="tvos-btn inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.11] border border-white/25 text-sky-100 backdrop-blur-xl cursor-pointer"
+        >
+          Accueil
+        </button>
       </header>
 
       <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 my-4 flex items-stretch">
@@ -580,7 +617,7 @@ export default function TvPage() {
           </div>
         ) : room?.status === 'playing' ? (
           <div className="w-full h-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            <div className="lg:col-span-8 h-full p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0">
+            <div className="lg:col-span-8 h-full p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0 pointer-events-none">
               <div className="flex items-center justify-between gap-3 shrink-0">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
                   {activeGameType === 'petit_bac'
@@ -594,7 +631,7 @@ export default function TvPage() {
                 </span>
               </div>
 
-              <div className="my-auto py-4 flex flex-col justify-center space-y-6 overflow-y-auto">
+              <div className="my-auto py-3 flex flex-col justify-center space-y-6 overflow-hidden">
                 {activeGameType === 'petit_bac' ? (
                   <>
                     <p className="text-sm uppercase tracking-[0.18em] text-sky-200 font-semibold">
@@ -606,42 +643,56 @@ export default function TvPage() {
                   </>
                 ) : !quizStarted ? (
                   <div className="space-y-2 max-w-2xl">
-                    <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-white leading-tight">
+                    <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white leading-tight">
                       Prêt pour le Quiz ?
                     </h1>
                   </div>
                 ) : !activeQuestion ? (
                   <div className="space-y-2">
-                    <h1 className="text-3xl md:text-4xl font-semibold text-white">
+                    <h1 className="text-3xl md:text-4xl font-bold text-white">
                       Aucune question disponible
                     </h1>
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    <h1 className="text-2xl md:text-4xl font-semibold tracking-tight text-white leading-snug">
+                  <div className="space-y-5 h-full flex flex-col justify-between">
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white leading-snug">
                       {activeQuestion.question}
                     </h1>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pointer-events-none">
-                      {activeQuestion.options.map((opt, i) => (
-                        <div
-                          key={`${activeQuestion.id}-${i}`}
-                          className="px-4 py-3.5 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center gap-3"
-                        >
-                          <span className="w-8 h-8 rounded-xl bg-sky-500/30 border border-sky-300/40 text-sky-200 text-sm font-bold flex items-center justify-center shrink-0">
-                            {String.fromCharCode(65 + i)}
-                          </span>
-                          <span className="text-base md:text-lg font-medium text-white">
-                            {opt}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
+                      {activeQuestion.options.map((opt, i) => {
+                        const style = ANSWER_TILE_STYLES[i] ?? ANSWER_TILE_STYLES[0]
+                        return (
+                          <div
+                            key={`${activeQuestion.id}-${i}`}
+                            style={{
+                              backgroundColor: style.bg,
+                              borderColor: style.border,
+                              color: style.text,
+                            }}
+                            className="p-5 md:p-6 rounded-[24px] border-2 flex items-center gap-4 shadow-lg"
+                          >
+                            <span
+                              style={{
+                                backgroundColor: style.badgeBg,
+                                color: style.badgeText,
+                              }}
+                              className="w-12 h-12 md:w-14 md:h-14 rounded-2xl text-xl md:text-2xl font-extrabold flex items-center justify-center shrink-0"
+                            >
+                              {style.letter}
+                            </span>
+                            <span className="text-xl md:text-2xl font-extrabold leading-tight break-words">
+                              {opt}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/15 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/15 shrink-0 pointer-events-auto">
                 <button
                   type="button"
                   onClick={handleResetRoom}
@@ -807,7 +858,7 @@ export default function TvPage() {
             </div>
 
             {/* COLONNE DROITE : TABLEAU DES JOUEURS */}
-            <div className="lg:col-span-4 h-full p-6 md:p-8 rounded-[30px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0">
+            <div className="lg:col-span-4 h-full p-6 md:p-8 rounded-[30px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0 pointer-events-none">
               <div className="flex items-center justify-between pb-4 border-b border-white/15 shrink-0">
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
                   Joueurs connectés
