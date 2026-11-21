@@ -170,28 +170,41 @@ export default function TvPage() {
   useEffect(() => {
     void refreshTvData();
 
-    const filter = roomCode ? `room_code=eq.${roomCode}` : undefined;
+    const channel = supabase.channel(`tv-sync-${roomCode || 'latest'}`);
 
-    const channel = supabase
-      .channel(`tv-sync-${roomCode || 'latest'}`)
-      .on(
+    if (roomCode) {
+      channel.on(
         'postgres_changes',
-        filter
-          ? { event: '*', schema: 'public', table: 'players', filter }
-          : { event: '*', schema: 'public', table: 'players' },
+        { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${roomCode}` },
         () => {
           void refreshTvData();
         }
-      )
-      .on(
-        filter
-          ? { event: '*', schema: 'public', table: 'rooms', filter }
-          : { event: '*', schema: 'public', table: 'rooms' },
+      );
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
         () => {
           void refreshTvData();
         }
-      )
-      .subscribe();
+      );
+    } else {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players' },
+        () => {
+          void refreshTvData();
+        }
+      );
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rooms' },
+        () => {
+          void refreshTvData();
+        }
+      );
+    }
+
+    channel.subscribe();
 
     const pollId = window.setInterval(() => {
       void refreshTvData();
