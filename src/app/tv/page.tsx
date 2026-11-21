@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
+import * as questionsModule from '@/data/questions'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -26,6 +27,30 @@ interface Room {
   current_game?: string | null
   current_round?: number | null
   config?: Record<string, unknown> | null
+}
+
+interface RawQuestion {
+  id?: string | number
+  question?: string
+  prompt?: string
+  title?: string
+  text?: string
+  intitule?: string
+  options?: string[]
+  choices?: string[]
+  answers?: string[]
+  propositions?: string[]
+  reponses?: string[]
+  category?: string
+  categorie?: string
+  theme?: string
+}
+
+interface NormalizedQuestion {
+  id: string | number
+  question: string
+  options: string[]
+  category?: string
 }
 
 const RANDOM_PLAYER_COLORS = [
@@ -53,6 +78,60 @@ function resolvePlayerColor(player: Player, index: number): string {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   }
   return RANDOM_PLAYER_COLORS[(hash + index) % RANDOM_PLAYER_COLORS.length]
+}
+
+function extractQuestionPool(): NormalizedQuestion[] {
+  const mod = questionsModule as Record<string, unknown>
+  const candidates: unknown[] = [
+    mod.default,
+    mod.QUESTIONS,
+    mod.questions,
+    mod.QUIZ_QUESTIONS,
+    mod.quizQuestions,
+    ...Object.values(mod),
+  ]
+
+  const rawList = candidates.find(
+    (item): item is RawQuestion[] => Array.isArray(item) && item.length > 0
+  )
+
+  if (!rawList) return []
+
+  return rawList
+    .map((item, idx) => {
+      const text =
+        item?.question ??
+        item?.prompt ??
+        item?.intitule ??
+        item?.title ??
+        item?.text ??
+        ''
+      const opts =
+        item?.options ??
+        item?.choices ??
+        item?.answers ??
+        item?.propositions ??
+        item?.reponses ??
+        []
+      const cat = item?.category ?? item?.categorie ?? item?.theme
+
+      return {
+        id: item?.id ?? idx,
+        question: String(text).trim(),
+        options: Array.isArray(opts) ? opts.map((o) => String(o)) : [],
+        category: cat ? String(cat) : undefined,
+      }
+    })
+    .filter((q) => q.question.length > 0)
+}
+
+function shuffleQuestions(list: NormalizedQuestion[]): NormalizedQuestion[] {
+  const copy = [...list]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
 }
 
 function generateRoomCode(): string {
@@ -186,8 +265,12 @@ export default function TvPage() {
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<'quiz' | 'petit_bac'>('quiz')
-  const [currentQuestion, setCurrentQuestion] = useState<string | null>(null)
   const [currentLetter, setCurrentLetter] = useState<string | null>(null)
+
+  const questionPool = useMemo(() => extractQuestionPool(), [])
+  const [quizDeck, setQuizDeck] = useState<NormalizedQuestion[]>([])
+  const [quizStarted, setQuizStarted] = useState(false)
+  const [questionIndex, setQuestionIndex] = useState(0)
 
   const createRoom = useCallback(async () => {
     setLoading(true)
@@ -267,10 +350,13 @@ export default function TvPage() {
     if (selectedMode === 'petit_bac') {
       const letters = 'ABCDEFGHIJKLMNOPRST'
       setCurrentLetter(letters[Math.floor(Math.random() * letters.length)])
-      setCurrentQuestion(null)
+      setQuizStarted(false)
+      setQuestionIndex(0)
     } else {
-      setCurrentQuestion('Question 1 : Prêt pour commencer ?')
       setCurrentLetter(null)
+      setQuizStarted(false)
+      setQuestionIndex(0)
+      setQuizDeck(shuffleQuestions(questionPool))
     }
 
     const { data, error } = await supabase
@@ -285,10 +371,27 @@ export default function TvPage() {
     }
   }
 
+  const handleStartQuizQuestions = () => {
+    const deck = shuffleQuestions(questionPool)
+    setQuizDeck(deck)
+    setQuestionIndex(0)
+    setQuizStarted(true)
+  }
+
+  const handleNextQuestion = () => {
+    if (questionIndex + 1 < quizDeck.length) {
+      setQuestionIndex((prev) => prev + 1)
+    } else {
+      setQuizDeck(shuffleQuestions(questionPool))
+      setQuestionIndex(0)
+    }
+  }
+
   const handleResetRoom = async () => {
     if (!room?.id) return
-    setCurrentQuestion(null)
     setCurrentLetter(null)
+    setQuizStarted(false)
+    setQuestionIndex(0)
 
     const { data, error } = await supabase
       .from('rooms')
@@ -312,6 +415,8 @@ export default function TvPage() {
     : ''
 
   const activeGameType = room?.game_type || selectedMode
+  const activeQuestion = quizDeck[questionIndex] ?? null
+  const isLastQuestion = quizDeck.length > 0 && questionIndex >= quizDeck.length - 1
 
   return (
     <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-5 md:px-10 md:py-7">
@@ -418,18 +523,22 @@ export default function TvPage() {
             </button>
           </div>
         ) : room?.status === 'playing' ? (
-          <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            <div className="tvos-card lg:col-span-2 p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-6">
-              <div className="flex items-center justify-between gap-3">
+          <div className="w-full h-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            <div className="tvos-card lg:col-span-8 h-full p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0">
+              <div className="flex items-center justify-between gap-3 shrink-0">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
-                  {activeGameType === 'petit_bac' ? 'Petit Bac' : 'Quiz'}
+                  {activeGameType === 'petit_bac'
+                    ? 'Petit Bac'
+                    : quizStarted && quizDeck.length > 0
+                    ? `Quiz • Question ${questionIndex + 1} / ${quizDeck.length}`
+                    : 'Quiz'}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/15 border border-white/20 text-slate-100">
-                  En cours
+                  {activeQuestion?.category || 'En cours'}
                 </span>
               </div>
 
-              <div className="space-y-4 my-auto">
+              <div className="my-auto py-4 flex flex-col justify-center space-y-6 overflow-y-auto">
                 {activeGameType === 'petit_bac' ? (
                   <>
                     <p className="text-sm uppercase tracking-[0.18em] text-sky-200 font-semibold">
@@ -439,14 +548,54 @@ export default function TvPage() {
                       {currentLetter || 'A'}
                     </p>
                   </>
+                ) : !quizStarted ? (
+                  <div className="space-y-4 max-w-2xl">
+                    <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-white leading-tight">
+                      Prêt pour le Quiz ?
+                    </h1>
+                    <p className="text-sm md:text-base text-slate-300">
+                      {questionPool.length > 0
+                        ? `${questionPool.length} questions chargées depuis src/data/questions.ts.`
+                        : 'Aucune question trouvée dans src/data/questions.ts.'}
+                    </p>
+                  </div>
+                ) : !activeQuestion ? (
+                  <div className="space-y-2">
+                    <h1 className="text-3xl md:text-4xl font-semibold text-white">
+                      Aucune question disponible
+                    </h1>
+                    <p className="text-sm text-slate-300">
+                      Vérifie l&apos;export de ton fichier src/data/questions.ts.
+                    </p>
+                  </div>
                 ) : (
-                  <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-white leading-tight">
-                    {currentQuestion || 'Partie en cours'}
-                  </h1>
+                  <div className="space-y-6">
+                    <h1 className="text-2xl md:text-4xl font-semibold tracking-tight text-white leading-snug">
+                      {activeQuestion.question}
+                    </h1>
+
+                    {activeQuestion.options.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        {activeQuestion.options.map((opt, i) => (
+                          <div
+                            key={`${activeQuestion.id}-${i}`}
+                            className="px-4 py-3.5 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center gap-3"
+                          >
+                            <span className="w-7 h-7 rounded-xl bg-sky-500/30 border border-sky-300/40 text-sky-200 text-xs font-bold flex items-center justify-center shrink-0">
+                              {String.fromCharCode(65 + i)}
+                            </span>
+                            <span className="text-sm md:text-base font-medium text-white">
+                              {opt}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/15 shrink-0">
                 <button
                   type="button"
                   onClick={handleResetRoom}
@@ -454,12 +603,35 @@ export default function TvPage() {
                 >
                   Retour au salon
                 </button>
+
+                {activeGameType === 'quiz' && (
+                  <div className="flex items-center gap-3">
+                    {!quizStarted ? (
+                      <button
+                        type="button"
+                        onClick={handleStartQuizQuestions}
+                        disabled={questionPool.length === 0}
+                        className="tvos-btn px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white text-sm font-semibold shadow-[0_14px_30px_-8px_rgba(14,165,233,0.65)] cursor-pointer"
+                      >
+                        Démarrer
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleNextQuestion}
+                        className="tvos-btn px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold shadow-[0_14px_30px_-8px_rgba(14,165,233,0.65)] cursor-pointer"
+                      >
+                        {isLastQuestion ? 'Recommencer' : 'Suivante'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="tvos-card p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-5">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+            <div className="tvos-card lg:col-span-4 h-full p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-5 min-h-0">
+              <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+                <div className="flex items-center justify-between shrink-0">
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
                     Classement
                   </span>
@@ -471,7 +643,7 @@ export default function TvPage() {
                 {players.length === 0 ? (
                   <p className="text-sm text-slate-300">Aucun joueur connecté.</p>
                 ) : (
-                  <ul className="space-y-2.5">
+                  <ul className="space-y-2.5 overflow-y-auto pr-1">
                     {players.map((p, idx) => {
                       const colorHex = resolvePlayerColor(p, idx)
                       return (
