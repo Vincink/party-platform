@@ -131,9 +131,9 @@ const ANSWER_TILE_STYLES: [AnswerTileStyle, AnswerTileStyle, AnswerTileStyle, An
     letter: 'B',
     bg: '#eab308',
     border: '#fef08a',
-    badgeBg: 'rgba(15, 23, 42, 0.16)',
-    badgeText: '#0f172a',
-    text: '#0f172a',
+    badgeBg: 'rgba(15, 23, 42, 0.28)',
+    badgeText: '#ffffff',
+    text: '#ffffff',
   },
   {
     letter: 'C',
@@ -833,7 +833,7 @@ export default function TvPage() {
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 py-4 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 pt-3 pb-2 flex flex-col overflow-hidden">
                 {activeGameType === 'petit_bac' ? (
                   <div className="my-auto space-y-4">
                     <p className="text-sm uppercase tracking-[0.18em] text-sky-200 font-semibold">
@@ -857,13 +857,13 @@ export default function TvPage() {
                   </div>
                 ) : (
                   <div className="flex-1 min-h-0 flex flex-col justify-between gap-4">
-                    <div className="flex-1 min-h-0 flex items-start pt-1">
-                      <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white leading-snug line-clamp-4">
+                    <div className="flex-1 min-h-0 flex items-start pt-5 md:pt-7">
+                      <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white leading-snug line-clamp-3">
                         {activeQuestion.question}
                       </h1>
                     </div>
 
-                    <div className="mt-auto shrink-0 grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-4 h-52 md:h-60">
+                    <div className="mt-auto shrink-0 grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-4 h-64 md:h-72">
                       {activeQuestion.options.map((opt, i) => {
                         const style = ANSWER_TILE_STYLES[i] ?? ANSWER_TILE_STYLES[0]
                         const isCorrect = i === activeQuestion.correctIndex
@@ -878,7 +878,7 @@ export default function TvPage() {
                               borderColor: isHighlighted ? '#ffffff' : style.border,
                               color: style.text,
                             }}
-                            className={`h-full px-5 py-4 rounded-[24px] flex items-center gap-4 transition-all duration-300 ${
+                            className={`relative h-full px-6 py-5 rounded-[24px] flex items-center justify-center text-center transition-all duration-300 ${
                               isHighlighted
                                 ? 'border-4 ring-4 ring-white/85 shadow-[0_0_40px_rgba(255,255,255,0.65)] scale-[1.015]'
                                 : 'border-2 shadow-lg'
@@ -889,11 +889,11 @@ export default function TvPage() {
                                 backgroundColor: style.badgeBg,
                                 color: style.badgeText,
                               }}
-                              className="w-12 h-12 md:w-14 md:h-14 rounded-2xl text-xl md:text-2xl font-extrabold flex items-center justify-center shrink-0"
+                              className="w-10 h-10 md:w-11 md:h-11 rounded-xl text-lg md:text-xl font-extrabold flex items-center justify-center shrink-0 mr-3.5"
                             >
                               {style.letter}
                             </span>
-                            <span className="text-xl md:text-2xl font-extrabold leading-tight line-clamp-2">
+                            <span className="text-xl md:text-2xl font-extrabold text-white text-center leading-tight line-clamp-2">
                               {opt}
                             </span>
                           </div>
