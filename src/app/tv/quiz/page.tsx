@@ -396,6 +396,7 @@ export default function TvQuizPage() {
   const activeRoomCode = room?.room_code || roomCode || 'SALON';
   const currentQuestion = BASE_QUESTIONS[questionIndex] || BASE_QUESTIONS[0];
   const isTimeOver = timeLeft <= 0;
+  const isDangerBlink = timeLeft > 0 && timeLeft <= 5;
   const usedPaletteIndices = new Set<number>();
 
   return (
@@ -412,6 +413,23 @@ export default function TvQuizPage() {
             box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1),
             border-color 240ms ease,
             background 240ms ease;
+        }
+        @keyframes redChronoBlink {
+          0%, 100% {
+            background-color: #dc2626;
+            border-color: #fca5a5;
+            color: #ffffff;
+            transform: scale(1);
+          }
+          50% {
+            background-color: rgba(220, 38, 38, 0.25);
+            border-color: #ef4444;
+            color: #fecaca;
+            transform: scale(1.06);
+          }
+        }
+        .chrono-blink-red {
+          animation: redChronoBlink 0.7s ease-in-out infinite;
         }
       `}</style>
 
@@ -444,24 +462,30 @@ export default function TvQuizPage() {
       </header>
 
       <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-stretch">
-        {/* Zone principale : Question + Chrono en haut à droite + Cases réponse calées en bas */}
-        <div className="h-full min-h-0 p-6 md:p-8 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-5">
-          <div className="flex items-start justify-between gap-4 shrink-0">
-            <div className="space-y-2 min-w-0 flex-1">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-                {currentQuestion.category}
-              </span>
-              <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white leading-tight">
-                {currentQuestion.question}
-              </h1>
-            </div>
-
-            <span className="inline-flex items-center px-4 py-2 rounded-2xl text-lg sm:text-xl font-extrabold uppercase tracking-[0.12em] bg-white/[0.14] border border-white/25 text-white tabular-nums shrink-0">
+        {/* Zone principale : Chrono en haut à droite + Question centrée un peu plus bas + Cases réponse remontées */}
+        <div className="relative h-full min-h-0 p-6 md:p-8 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
+          <div className="flex items-start justify-end shrink-0">
+            <span
+              className={`inline-flex items-center px-4 py-2 rounded-2xl text-lg sm:text-xl font-extrabold uppercase tracking-[0.12em] border tabular-nums shrink-0 ${
+                isDangerBlink
+                  ? 'chrono-blink-red shadow-[0_0_24px_rgba(239,68,68,0.75)]'
+                  : 'bg-white/[0.14] border-white/25 text-white'
+              }`}
+            >
               {timeLeft}s
             </span>
           </div>
 
-          <div className="mt-auto flex flex-col gap-5">
+          <div className="mt-2 mb-2 px-4 sm:px-10 text-center flex flex-col items-center justify-center gap-2 shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+              {currentQuestion.category}
+            </span>
+            <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white leading-tight max-w-3xl">
+              {currentQuestion.question}
+            </h1>
+          </div>
+
+          <div className="mt-auto mb-3 flex flex-col gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {currentQuestion.options.map((opt, idx) => {
                 const colorStyle = OPTION_STYLES[idx] || OPTION_STYLES[0];
@@ -499,7 +523,7 @@ export default function TvQuizPage() {
               })}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pt-1">
               <button
                 type="button"
                 disabled={timeLeft > 0}
