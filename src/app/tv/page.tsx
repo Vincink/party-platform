@@ -1,6 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
+interface PlayerRow {
+  id: number;
+  pseudo: string | null;
+  avatar: string | null;
+  score: number | null;
+  is_connected: boolean | null;
+  answer: string | null;
+  room_code: string | null;
+  client_id: string | null;
+}
+
+interface RoomRow {
+  id: number;
+  room_code: string;
+  status: string | null;
+  config: unknown;
+}
 
 interface TvPlayerState {
   id: string;
@@ -8,18 +27,14 @@ interface TvPlayerState {
   color?: string;
   score: number;
   hasAnswered: boolean;
-  lastPointsEarned?: number;
+  answerValue?: string | null;
 }
 
 interface TvPlayersBarProps {
   players: TvPlayerState[];
-  showEarnedPoints?: boolean;
 }
 
-function TvPlayersBar({
-  players,
-  showEarnedPoints = false,
-}: TvPlayersBarProps) {
+function TvPlayersBar({ players }: TvPlayersBarProps) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-3">
       {players.map((player) => (
@@ -31,15 +46,14 @@ function TvPlayersBar({
               : 'bg-slate-900/80 border-white/15'
           }`}
         >
-          {/* Pastille couleur joueur */}
           <span
-            className="h-4 w-4 rounded-full shrink-0"
+            className="h-4 w-4 rounded-full shrink-0 ring-2 ring-white/30"
             style={{ backgroundColor: player.color || '#38bdf8' }}
+            aria-hidden="true"
           />
 
-          {/* Nom + statut de réponse */}
-          <div className="flex flex-col">
-            <span className="font-bold text-base text-white leading-tight">
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-base text-white leading-tight truncate">
               {player.name}
             </span>
             <span
@@ -47,23 +61,157 @@ function TvPlayersBar({
                 player.hasAnswered ? 'text-emerald-300' : 'text-slate-400'
               }`}
             >
-              {player.hasAnswered ? '✓ A répondu' : 'Réfléchit…'}
+              {player.hasAnswered ? '✓ A répondu' : 'En attente…'}
             </span>
           </div>
 
-          {/* Score */}
           <div className="ml-2 flex items-center gap-1.5">
             <span className="rounded-xl bg-white/10 px-3 py-1 text-sm font-extrabold text-white">
               {player.score} pts
             </span>
-            {showEarnedPoints && (player.lastPointsEarned ?? 0) > 0 && (
-              <span className="rounded-xl bg-emerald-500 px-2 py-1 text-xs font-black text-slate-950">
-                +{player.lastPointsEarned}
-              </span>
-            )}
           </div>
         </div>
       ))}
     </div>
+  );
+}
+
+export default function TvPage() {
+  const [roomCode, setRoomCode] = useState<string>('');
+  const [room, setRoom] = useState<RoomRow | null>(null);
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = (
+      params.get('code') ||
+      params.get('room') ||
+      params.get('room_code') ||
+      ''
+    )
+      .trim()
+      .toUpperCase();
+
+    const storedCode = (
+      window.localStorage.getItem('party_tv_room_code') ||
+      window.localStorage.getItem('party_room_code') ||
+      ''
+    )
+      .trim()
+      .toUpperCase();
+
+    const activeCode = urlCode || storedCode;
+
+    if (activeCode) {
+      window.localStorage.setItem('party_tv_room_code', activeCode);
+      setRoomCode(activeCode);
+    }
+  }, []);
+
+  const refreshTvData = useCallback(async () => {
+    if (!roomCode) return;
+
+    const { data: roomData } = await supabase
+      .from('rooms')
+      .select('id, room_code, status, config')
+      .eq('room_code', roomCode)
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (roomData) {
+      setRoom(roomData as RoomRow);
+    }
+
+    const { data: playersData } = await supabase
+      .from('players')
+      .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
+      .eq('room_code', roomCode)
+      .order('id', { ascending: true });
+
+    if (Array.isArray(playersData)) {
+      setPlayers(playersData as PlayerRow[]);
+    }
+  }, [roomCode]);
+
+  useEffect(() => {
+    if (!roomCode) return;
+
+    void refreshTvData();
+
+    const channel = supabase
+      .channel(`tv-sync-${roomCode}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${roomCode}` },
+        () => {
+          void refreshTvData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
+        () => {
+          void refreshTvData();
+        }
+      )
+      .subscribe();
+
+    const pollId = window.setInterval(() => {
+      void refreshTvData();
+    }, 2500);
+
+    return () => {
+      window.clearInterval(pollId);
+      void supabase.removeChannel(channel);
+    };
+  }, [roomCode, refreshTvData]);
+
+  const tvPlayers: TvPlayerState[] = players.map((p) => ({
+    id: String(p.id),
+    name: p.pseudo?.trim() || 'Joueur',
+    color: p.avatar?.trim() || '#38bdf8',
+    score: typeof p.score === 'number' ? p.score : 0,
+    hasAnswered: typeof p.answer === 'string' && p.answer.trim().length > 0,
+    answerValue: p.answer,
+  }));
+
+  const answeredCount = tvPlayers.filter((p) => p.hasAnswered).length;
+
+  return (
+    <main className="min-h-screen w-full bg-slate-950 text-white flex flex-col justify-between p-6">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            Écran TV {roomCode ? `• Salon ${roomCode}` : ''}
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-black">
+            {room?.status ? `État : ${room.status}` : 'En attente de la partie'}
+          </h1>
+        </div>
+
+        <div className="rounded-2xl bg-slate-900 border border-white/10 px-4 py-2 text-sm font-bold text-emerald-300">
+          Réponses : {answeredCount} / {tvPlayers.length}
+        </div>
+      </header>
+
+      <section className="my-auto py-6">
+        {tvPlayers.length === 0 ? (
+          <p className="text-center text-slate-400 text-lg">
+            {roomCode
+              ? `Aucun joueur connecté sur le salon ${roomCode}.`
+              : 'Ajoutez ?code=XXXXXX dans l’adresse pour afficher le salon.'}
+          </p>
+        ) : (
+          <TvPlayersBar players={tvPlayers} />
+        )}
+      </section>
+
+      <footer className="text-xs text-slate-500 text-center">
+        Affichage synchronisé en direct avec la table joueurs.
+      </footer>
+    </main>
   );
 }
