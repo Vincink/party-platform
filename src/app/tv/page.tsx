@@ -213,6 +213,7 @@ export default function TVPage() {
   const isRevealingRef = useRef<boolean>(false)
   const bacRoundsRef = useRef<PetitBacRound[]>(bacRounds)
   const bacRoundIndexRef = useRef<number>(0)
+  const bacPhaseRef = useRef<'playing' | 'review' | 'applied'>('playing')
   const isBacRevealingRef = useRef<boolean>(false)
   const countdownLaunchedRef = useRef<boolean>(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -256,6 +257,10 @@ export default function TVPage() {
   useEffect(() => {
     bacRoundIndexRef.current = bacRoundIndex
   }, [bacRoundIndex])
+
+  useEffect(() => {
+    bacPhaseRef.current = bacPhase
+  }, [bacPhase])
 
   const stopTimerSound = useCallback(() => {
     const audio = audioRef.current
@@ -380,8 +385,11 @@ export default function TVPage() {
   }, [stopTimerSound])
 
   const triggerBacReveal = useCallback(async () => {
-    if (isBacRevealingRef.current) return
+    if (isBacRevealingRef.current || bacPhaseRef.current !== 'playing') return
     isBacRevealingRef.current = true
+    bacPhaseRef.current = 'review'
+    setBacTimeLeft(0)
+    setBacPhase('review')
     stopTimerSound()
 
     const currentPin = pinRef.current
@@ -400,7 +408,6 @@ export default function TVPage() {
     }
 
     setBacEvaluations(mapByPlayer)
-    setBacPhase('review')
 
     if (currentPin) {
       await supabase
@@ -424,7 +431,7 @@ export default function TVPage() {
       setJoinUrl(`${window.location.origin}/player?pin=${randomPin}`)
     }
 
-    async function createRoom() {
+    const createRoom = async () => {
       const { error } = await supabase
         .from('rooms')
         .insert([
@@ -453,7 +460,6 @@ export default function TVPage() {
           filter: `session_id=eq.${randomPin}`,
         },
         (payload) => {
-          // Entrée autorisée uniquement entre deux parties
           if (gameRunningRef.current || gameFinishedRef.current) return
           const newPlayer = payload.new as Player
           setPlayersList((prev) =>
@@ -474,11 +480,17 @@ export default function TVPage() {
         (payload) => {
           const updatedPlayer = payload.new as Player
           setPlayersList((prev) =>
-            prev.map((p) =>
-              p.id === updatedPlayer.id
-                ? { ...p, ...updatedPlayer, score: updatedPlayer.score ?? p.score ?? 0 }
-                : p
-            )
+            prev.map((p) => {
+              if (p.id !== updatedPlayer.id) return p
+              const allowAnswerSync =
+                selectedGameRef.current !== 'petitbac' || bacPhaseRef.current === 'playing'
+              return {
+                ...p,
+                pseudo: updatedPlayer.pseudo ?? p.pseudo,
+                score: updatedPlayer.score ?? p.score ?? 0,
+                answer: allowAnswerSync ? updatedPlayer.answer : p.answer,
+              }
+            })
           )
         }
       )
@@ -513,6 +525,8 @@ export default function TVPage() {
           startTimerSound()
         } else {
           const firstRound = bacRoundsRef.current[0]
+          isBacRevealingRef.current = false
+          bacPhaseRef.current = 'playing'
           setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
           setBacPhase('playing')
           if (currentPin && firstRound) {
@@ -568,10 +582,13 @@ export default function TVPage() {
 
   const answeredCount = playersList.filter((p) => Boolean(p.answer && p.answer.trim())).length
   const allPlayersAnsweredBac =
-    isBacPlayingActive && playersList.length > 0 && answeredCount >= playersList.length
+    isBacPlayingActive &&
+    !isBacRevealingRef.current &&
+    playersList.length > 0 &&
+    playersList.every((p) => Boolean(p.answer && p.answer.trim()))
 
   useEffect(() => {
-    if (!isBacPlayingActive) return
+    if (!isBacPlayingActive || isBacRevealingRef.current) return
 
     if (allPlayersAnsweredBac) {
       void triggerBacReveal()
@@ -579,6 +596,10 @@ export default function TVPage() {
     }
 
     const timer = window.setInterval(() => {
+      if (!isBacPlayingActive || isBacRevealingRef.current) {
+        window.clearInterval(timer)
+        return
+      }
       setBacTimeLeft((prev) => {
         if (prev <= 1) {
           window.clearInterval(timer)
@@ -632,6 +653,8 @@ export default function TVPage() {
     } else {
       const rounds = pickPetitBacRounds()
       bacRoundsRef.current = rounds
+      isBacRevealingRef.current = false
+      bacPhaseRef.current = 'playing'
       setBacRounds(rounds)
       setBacRoundIndex(0)
       setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
@@ -651,6 +674,8 @@ export default function TVPage() {
     const currentPin = pin || pinRef.current
 
     countdownLaunchedRef.current = false
+    isBacRevealingRef.current = false
+    bacPhaseRef.current = 'playing'
     setStartCountdown(null)
     setGameRunning(false)
     setGameFinished(false)
@@ -664,6 +689,7 @@ export default function TVPage() {
     setBacPhase('playing')
     setBacEvaluations({})
     setGameOpened(false)
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
 
     if (currentPin) {
       await supabase
@@ -675,8 +701,6 @@ export default function TVPage() {
         .update({ status: 'waiting', game_type: selectedGameRef.current })
         .eq('room_code', currentPin)
     }
-
-    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
   }
 
   async function startGame() {
@@ -696,12 +720,16 @@ export default function TVPage() {
     } else {
       const rounds = pickPetitBacRounds()
       bacRoundsRef.current = rounds
+      isBacRevealingRef.current = false
+      bacPhaseRef.current = 'playing'
       setBacRounds(rounds)
       setBacRoundIndex(0)
       setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
       setBacPhase('playing')
       setBacEvaluations({})
     }
+
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
 
     if (currentPin) {
       await supabase
@@ -712,7 +740,6 @@ export default function TVPage() {
         .from('rooms')
         .update({ game_type: activeGame })
         .eq('room_code', currentPin)
-      setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
     }
 
     countdownLaunchedRef.current = false
@@ -724,6 +751,8 @@ export default function TVPage() {
   async function stopGame() {
     stopTimerSound()
     countdownLaunchedRef.current = false
+    isBacRevealingRef.current = false
+    bacPhaseRef.current = 'playing'
     setStartCountdown(null)
     setGameRunning(false)
     setRevealAnswers(false)
@@ -731,6 +760,7 @@ export default function TVPage() {
     setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
     setBacPhase('playing')
     setBacEvaluations({})
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
 
     const currentPin = pin || pinRef.current
     if (currentPin) {
@@ -743,7 +773,6 @@ export default function TVPage() {
         .update({ status: 'waiting' })
         .eq('room_code', currentPin)
     }
-    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
   }
 
   async function nextQuestion() {
@@ -752,14 +781,13 @@ export default function TVPage() {
     const nextIdx = Math.min(questionIndexRef.current + 1, deckQuestionsRef.current.length - 1)
     setRevealAnswers(false)
     setTimeLeft(QUESTION_DURATION)
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
+    setQuestionIndex(nextIdx)
 
     await supabase
       .from('players')
       .update({ answer: null })
       .eq('session_id', currentPin)
-
-    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
-    setQuestionIndex(nextIdx)
 
     await supabase
       .from('rooms')
@@ -805,6 +833,7 @@ export default function TVPage() {
     )
 
     setPlayersList(updatedList)
+    bacPhaseRef.current = 'applied'
     setBacPhase('applied')
 
     if (currentPin) {
@@ -821,32 +850,37 @@ export default function TVPage() {
     const nextIdx = Math.min(bacRoundIndexRef.current + 1, bacRoundsRef.current.length - 1)
     const nextRound = bacRoundsRef.current[nextIdx]
 
+    isBacRevealingRef.current = false
+    bacPhaseRef.current = 'playing'
+    bacRoundIndexRef.current = nextIdx
     setBacEvaluations({})
     setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
-    setBacPhase('playing')
-
-    await supabase
-      .from('players')
-      .update({ answer: null })
-      .eq('session_id', currentPin)
-
-    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
     setBacRoundIndex(nextIdx)
+    setBacPhase('playing')
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
 
-    if (currentPin && nextRound) {
+    if (currentPin) {
       await supabase
-        .from('rooms')
-        .update({
-          status: `bac_playing:${nextIdx}:${nextRound.letter}:${encodeURIComponent(nextRound.category)}`,
-          game_type: 'petitbac',
-        })
-        .eq('room_code', currentPin)
+        .from('players')
+        .update({ answer: null })
+        .eq('session_id', currentPin)
+
+      if (nextRound) {
+        await supabase
+          .from('rooms')
+          .update({
+            status: `bac_playing:${nextIdx}:${nextRound.letter}:${encodeURIComponent(nextRound.category)}`,
+            game_type: 'petitbac',
+          })
+          .eq('room_code', currentPin)
+      }
     }
   }
 
   async function finishGame() {
     stopTimerSound()
     countdownLaunchedRef.current = false
+    isBacRevealingRef.current = false
     setStartCountdown(null)
     setGameRunning(false)
     const currentPin = pin || pinRef.current
@@ -863,16 +897,6 @@ export default function TVPage() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
 
-    await supabase
-      .from('players')
-      .update({ score: 0, answer: null })
-      .eq('session_id', currentPin)
-
-    await supabase
-      .from('rooms')
-      .update({ status: 'waiting', game_type: selectedGameRef.current })
-      .eq('room_code', currentPin)
-
     const picked = pickRandomQuestions(selectedThemeRef.current)
     deckQuestionsRef.current = picked
     setDeckQuestions(picked)
@@ -882,6 +906,8 @@ export default function TVPage() {
     setBacRounds(rounds)
 
     countdownLaunchedRef.current = false
+    isBacRevealingRef.current = false
+    bacPhaseRef.current = 'playing'
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
     setGameFinished(false)
     setGameOpened(false)
@@ -896,6 +922,18 @@ export default function TVPage() {
     setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
     setBacPhase('playing')
     setBacEvaluations({})
+
+    if (currentPin) {
+      await supabase
+        .from('players')
+        .update({ score: 0, answer: null })
+        .eq('session_id', currentPin)
+
+      await supabase
+        .from('rooms')
+        .update({ status: 'waiting', game_type: selectedGameRef.current })
+        .eq('room_code', currentPin)
+    }
   }
 
   const activeGameOption =
