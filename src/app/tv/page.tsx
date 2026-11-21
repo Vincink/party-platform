@@ -469,7 +469,7 @@ export default function TVPage() {
     }
   }, [])
 
-  // Décompte 3, 2, 1 sans effet de bord dans setState
+  // Décompte 3, 2, 1 sans déclaration de fonction imbriquée dans un bloc
   useEffect(() => {
     if (!gameRunning || startCountdown === null || gameFinished) return
 
@@ -480,7 +480,7 @@ export default function TVPage() {
       const currentPin = pinRef.current
       const activeGame = selectedGameRef.current
 
-      async function launchRoundOne() {
+      const launchRoundOne = async () => {
         if (activeGame === 'quiz') {
           setTimeLeft(QUESTION_DURATION)
           if (currentPin) {
