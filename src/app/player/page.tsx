@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -42,7 +42,6 @@ function getOrCreateClientId(): string {
 }
 
 function PlayerContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const [roomCode, setRoomCode] = useState('')
@@ -173,22 +172,11 @@ function PlayerContent() {
     setJoining(false)
   }
 
-  const handleLeaveRoom = async () => {
-    if (player?.id) {
-      await supabase
-        .from('players')
-        .update({ is_connected: false })
-        .eq('id', player.id)
-    }
-    setPlayer(null)
-    setRoom(null)
-    setErrorMsg(null)
-  }
-
   return (
-    <main className="relative min-h-screen w-full overflow-x-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-5 py-6 sm:px-8 sm:py-8">
+    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-5 py-6 sm:px-8 sm:py-8">
       <style>{`
         html, body {
+          overflow: hidden;
           overscroll-behavior: none;
           font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
         }
@@ -221,32 +209,23 @@ function PlayerContent() {
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
       />
 
-      <header className="relative z-10 flex items-center justify-between max-w-xl w-full mx-auto gap-3">
+      <header className="relative z-10 flex items-center justify-between max-w-xl w-full mx-auto gap-3 shrink-0">
         <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
           tvOS • Joueur
         </span>
 
-        <div className="flex items-center gap-2.5">
-          {room?.room_code && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] bg-white/[0.14] border border-white/25 text-white backdrop-blur-xl">
-              {room.room_code}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="tvos-btn inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.11] border border-white/25 text-sky-100 backdrop-blur-xl cursor-pointer"
-          >
-            Accueil
-          </button>
-        </div>
+        {room?.room_code && (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] bg-white/[0.14] border border-white/25 text-white backdrop-blur-xl">
+            {room.room_code}
+          </span>
+        )}
       </header>
 
-      <section className="relative z-10 max-w-xl w-full mx-auto my-auto py-6">
+      <section className="relative z-10 max-w-xl w-full mx-auto my-auto flex-1 flex items-center justify-center">
         {!player || !room ? (
           <form
             onSubmit={handleJoinRoom}
-            className="tvos-card p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-5"
+            className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-5"
           >
             <div className="space-y-1 text-center">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
@@ -315,7 +294,7 @@ function PlayerContent() {
             </button>
           </form>
         ) : room.status === 'playing' ? (
-          <div className="tvos-card p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-6">
+          <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-6">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
                 {room.game_type === 'petit_bac' ? 'Petit Bac' : 'Quiz'}
@@ -350,17 +329,9 @@ function PlayerContent() {
                   : 'La question est affichée sur la TV : prépare ta réponse.'}
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={handleLeaveRoom}
-              className="tvos-btn w-full py-3 px-4 rounded-2xl bg-white/12 border border-white/20 text-slate-200 text-xs font-semibold uppercase tracking-[0.15em] cursor-pointer"
-            >
-              Quitter le salon
-            </button>
           </div>
         ) : (
-          <div className="tvos-card p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 text-center space-y-6">
+          <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 text-center space-y-6">
             <div className="space-y-1">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] bg-emerald-400/20 border border-emerald-300/35 text-emerald-200">
                 Connecté
@@ -384,19 +355,11 @@ function PlayerContent() {
                 L&apos;hôte va bientôt lancer la partie depuis la TV.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={handleLeaveRoom}
-              className="tvos-btn w-full py-3 px-4 rounded-2xl bg-white/12 border border-white/20 text-slate-200 text-xs font-semibold uppercase tracking-[0.15em] cursor-pointer"
-            >
-              Changer de salon ou de pseudo
-            </button>
           </div>
         )}
       </section>
 
-      <footer className="relative z-10 max-w-xl w-full mx-auto text-center">
+      <footer className="relative z-10 max-w-xl w-full mx-auto text-center shrink-0">
         <p className="text-xs tracking-wide text-slate-400">
           Manette joueur • Synchronisation temps réel
         </p>
@@ -409,7 +372,7 @@ export default function PlayerPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen w-full bg-[#0e172a] text-white flex items-center justify-center p-6">
+        <main className="h-screen w-full overflow-hidden bg-[#0e172a] text-white flex items-center justify-center p-6">
           <p className="text-sm text-slate-300">Chargement...</p>
         </main>
       }
