@@ -36,11 +36,13 @@ interface RawQuestion {
   title?: string
   text?: string
   intitule?: string
+  label?: string
   options?: unknown[]
   choices?: unknown[]
   answers?: unknown[]
   propositions?: unknown[]
   reponses?: unknown[]
+  items?: unknown[]
   a?: string
   b?: string
   c?: string
@@ -65,6 +67,23 @@ interface RawQuestion {
   reponse2?: string
   reponse3?: string
   reponse4?: string
+  reponseA?: string
+  reponseB?: string
+  reponseC?: string
+  reponseD?: string
+  correctIndex?: number | string
+  correct_index?: number | string
+  answerIndex?: number | string
+  answer_index?: number | string
+  correctOption?: number | string
+  correct?: number | string | boolean
+  answer?: number | string
+  reponse?: number | string
+  bonneReponse?: number | string
+  bonne_reponse?: number | string
+  correctAnswer?: number | string
+  correct_answer?: number | string
+  solution?: number | string
   category?: string
   categorie?: string
   theme?: string
@@ -74,6 +93,7 @@ interface NormalizedQuestion {
   id: string | number
   question: string
   options: [string, string, string, string]
+  correctIndex: number
   category?: string
 }
 
@@ -85,6 +105,8 @@ interface AnswerTileStyle {
   badgeText: string
   text: string
 }
+
+const QUESTION_DURATION_SECONDS = 15
 
 const ANSWER_TILE_STYLES: [AnswerTileStyle, AnswerTileStyle, AnswerTileStyle, AnswerTileStyle] = [
   {
@@ -148,51 +170,130 @@ function resolvePlayerColor(player: Player, index: number): string {
   return RANDOM_PLAYER_COLORS[(hash + index) % RANDOM_PLAYER_COLORS.length]
 }
 
-function extractOptionText(entry: unknown): string {
+function extractOptionEntry(entry: unknown): { text: string; isCorrect: boolean } {
   if (typeof entry === 'string' || typeof entry === 'number') {
-    return String(entry).trim()
+    return { text: String(entry).trim(), isCorrect: false }
   }
   if (entry && typeof entry === 'object') {
     const obj = entry as Record<string, unknown>
-    const val = obj.text ?? obj.label ?? obj.value ?? obj.title ?? obj.reponse ?? obj.option
-    if (val !== undefined && val !== null) {
-      return String(val).trim()
+    const val =
+      obj.text ??
+      obj.label ??
+      obj.value ??
+      obj.title ??
+      obj.reponse ??
+      obj.answer ??
+      obj.option ??
+      obj.intitule ??
+      obj.name
+    const isCorrect = Boolean(
+      obj.isCorrect ?? obj.is_correct ?? obj.correct ?? obj.valid ?? obj.isRight
+    )
+    return {
+      text: val !== undefined && val !== null ? String(val).trim() : '',
+      isCorrect,
     }
   }
-  return ''
+  return { text: '', isCorrect: false }
 }
 
-function extractFourOptions(item: RawQuestion): string[] {
+function extractOptionsAndCorrect(item: RawQuestion): {
+  options: [string, string, string, string]
+  correctIndex: number
+} {
+  let texts: string[] = []
+  let flaggedCorrectIndex = -1
+
   const arraySource =
     item?.options ??
     item?.choices ??
     item?.answers ??
     item?.propositions ??
-    item?.reponses
+    item?.reponses ??
+    item?.items
 
   if (Array.isArray(arraySource) && arraySource.length > 0) {
-    return arraySource.map(extractOptionText).filter((s) => s.length > 0).slice(0, 4)
-  }
+    const parsed = arraySource
+      .map(extractOptionEntry)
+      .filter((entry) => entry.text.length > 0)
+      .slice(0, 4)
 
-  const discreteCandidates = [
-    [item?.a, item?.b, item?.c, item?.d],
-    [item?.A, item?.B, item?.C, item?.D],
-    [item?.optionA, item?.optionB, item?.optionC, item?.optionD],
-    [item?.option1, item?.option2, item?.option3, item?.option4],
-    [item?.choice1, item?.choice2, item?.choice3, item?.choice4],
-    [item?.reponse1, item?.reponse2, item?.reponse3, item?.reponse4],
-  ]
+    texts = parsed.map((p) => p.text)
+    flaggedCorrectIndex = parsed.findIndex((p) => p.isCorrect)
+  } else {
+    const discreteCandidates = [
+      [item?.a, item?.b, item?.c, item?.d],
+      [item?.A, item?.B, item?.C, item?.D],
+      [item?.optionA, item?.optionB, item?.optionC, item?.optionD],
+      [item?.option1, item?.option2, item?.option3, item?.option4],
+      [item?.choice1, item?.choice2, item?.choice3, item?.choice4],
+      [item?.reponse1, item?.reponse2, item?.reponse3, item?.reponse4],
+      [item?.reponseA, item?.reponseB, item?.reponseC, item?.reponseD],
+    ]
 
-  for (const group of discreteCandidates) {
-    const cleaned = group
-      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-      .map((v) => v.trim())
-    if (cleaned.length > 0) {
-      return cleaned.slice(0, 4)
+    for (const group of discreteCandidates) {
+      const cleaned = group
+        .filter((v): v is string | number => v !== undefined && v !== null && String(v).trim().length > 0)
+        .map((v) => String(v).trim())
+      if (cleaned.length > 0) {
+        texts = cleaned.slice(0, 4)
+        break
+      }
     }
   }
 
-  return []
+  const fourOptions: [string, string, string, string] = [
+    texts[0] ?? '',
+    texts[1] ?? '',
+    texts[2] ?? '',
+    texts[3] ?? '',
+  ]
+
+  if (flaggedCorrectIndex >= 0 && flaggedCorrectIndex < 4) {
+    return { options: fourOptions, correctIndex: flaggedCorrectIndex }
+  }
+
+  const rawAnswer =
+    item?.correctIndex ??
+    item?.correct_index ??
+    item?.answerIndex ??
+    item?.answer_index ??
+    item?.correctOption ??
+    item?.correctAnswer ??
+    item?.correct_answer ??
+    item?.bonneReponse ??
+    item?.bonne_reponse ??
+    item?.answer ??
+    item?.reponse ??
+    item?.solution ??
+    (typeof item?.correct !== 'boolean' ? item?.correct : undefined)
+
+  let resolvedIndex = 0
+
+  if (typeof rawAnswer === 'number' && Number.isFinite(rawAnswer)) {
+    if (rawAnswer >= 0 && rawAnswer <= 3) {
+      resolvedIndex = rawAnswer
+    } else if (rawAnswer >= 1 && rawAnswer <= 4) {
+      resolvedIndex = rawAnswer - 1
+    }
+  } else if (typeof rawAnswer === 'string') {
+    const trimmed = rawAnswer.trim()
+    const upper = trimmed.toUpperCase()
+    if (upper === 'A' || upper === '0') resolvedIndex = 0
+    else if (upper === 'B' || upper === '1') resolvedIndex = 1
+    else if (upper === 'C' || upper === '2') resolvedIndex = 2
+    else if (upper === 'D' || upper === '3') resolvedIndex = 3
+    else {
+      const exactMatch = fourOptions.findIndex(
+        (opt) => opt.toLowerCase() === trimmed.toLowerCase()
+      )
+      if (exactMatch >= 0) {
+        resolvedIndex = exactMatch
+      }
+    }
+  }
+
+  return { options: fourOptions, correctIndex: resolvedIndex }
 }
 
 function extractQuestionPool(): NormalizedQuestion[] {
@@ -220,20 +321,16 @@ function extractQuestionPool(): NormalizedQuestion[] {
         item?.intitule ??
         item?.title ??
         item?.text ??
+        item?.label ??
         ''
-      const rawOpts = extractFourOptions(item)
-      const fourOptions: [string, string, string, string] = [
-        rawOpts[0] ?? 'Réponse A',
-        rawOpts[1] ?? 'Réponse B',
-        rawOpts[2] ?? 'Réponse C',
-        rawOpts[3] ?? 'Réponse D',
-      ]
+      const { options, correctIndex } = extractOptionsAndCorrect(item)
       const cat = item?.category ?? item?.categorie ?? item?.theme
 
       return {
         id: item?.id ?? idx,
         question: String(text).trim(),
-        options: fourOptions,
+        options,
+        correctIndex,
         category: cat ? String(cat) : undefined,
       }
     })
@@ -386,6 +483,7 @@ export default function TvPage() {
   const [quizDeck, setQuizDeck] = useState<NormalizedQuestion[]>([])
   const [quizStarted, setQuizStarted] = useState(false)
   const [questionIndex, setQuestionIndex] = useState(0)
+  const [timeLeft, setTimeLeft] = useState<number>(QUESTION_DURATION_SECONDS)
 
   const createRoom = useCallback(async () => {
     setLoading(true)
@@ -459,6 +557,26 @@ export default function TvPage() {
     }
   }, [room?.id, room?.room_code])
 
+  const activeGameType = room?.game_type || selectedMode
+  const activeQuestion = quizDeck[questionIndex] ?? null
+  const isLastQuestion = quizDeck.length > 0 && questionIndex >= quizDeck.length - 1
+  const isTimeUp = quizStarted && timeLeft === 0
+
+  useEffect(() => {
+    if (room?.status !== 'playing' || activeGameType !== 'quiz' || !quizStarted || !activeQuestion) {
+      return
+    }
+    if (timeLeft <= 0) return
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1))
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [room?.status, activeGameType, quizStarted, activeQuestion, timeLeft])
+
   const handleStartGame = async () => {
     if (!room?.id) return
 
@@ -467,10 +585,12 @@ export default function TvPage() {
       setCurrentLetter(letters[Math.floor(Math.random() * letters.length)])
       setQuizStarted(false)
       setQuestionIndex(0)
+      setTimeLeft(QUESTION_DURATION_SECONDS)
     } else {
       setCurrentLetter(null)
       setQuizStarted(false)
       setQuestionIndex(0)
+      setTimeLeft(QUESTION_DURATION_SECONDS)
       setQuizDeck(shuffleQuestions(questionPool))
     }
 
@@ -490,16 +610,20 @@ export default function TvPage() {
     const deck = shuffleQuestions(questionPool)
     setQuizDeck(deck)
     setQuestionIndex(0)
+    setTimeLeft(QUESTION_DURATION_SECONDS)
     setQuizStarted(true)
   }
 
   const handleNextQuestion = () => {
+    if (timeLeft > 0) return
+
     if (questionIndex + 1 < quizDeck.length) {
       setQuestionIndex((prev) => prev + 1)
     } else {
       setQuizDeck(shuffleQuestions(questionPool))
       setQuestionIndex(0)
     }
+    setTimeLeft(QUESTION_DURATION_SECONDS)
   }
 
   const handleResetRoom = async () => {
@@ -507,6 +631,7 @@ export default function TvPage() {
     setCurrentLetter(null)
     setQuizStarted(false)
     setQuestionIndex(0)
+    setTimeLeft(QUESTION_DURATION_SECONDS)
 
     const { data, error } = await supabase
       .from('rooms')
@@ -528,10 +653,6 @@ export default function TvPage() {
   const qrCodeSrc = joinUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(joinUrl)}`
     : ''
-
-  const activeGameType = room?.game_type || selectedMode
-  const activeQuestion = quizDeck[questionIndex] ?? null
-  const isLastQuestion = quizDeck.length > 0 && questionIndex >= quizDeck.length - 1
 
   return (
     <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-5 md:px-10 md:py-7">
@@ -562,8 +683,8 @@ export default function TvPage() {
             box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
             background 200ms ease;
         }
-        .tvos-btn:hover,
-        .tvos-btn:focus-visible {
+        .tvos-btn:hover:not(:disabled),
+        .tvos-btn:focus-visible:not(:disabled) {
           transform: scale(1.025);
           box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
           outline: none;
@@ -626,51 +747,77 @@ export default function TvPage() {
                     ? `Quiz • Question ${questionIndex + 1} / ${quizDeck.length}`
                     : 'Quiz'}
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/15 border border-white/20 text-slate-100">
-                  {activeQuestion?.category || 'En cours'}
-                </span>
+
+                <div className="flex items-center gap-2.5">
+                  {activeGameType === 'quiz' && quizStarted && activeQuestion && (
+                    <span
+                      className={`px-3.5 py-1 rounded-full text-sm font-extrabold tracking-wider border transition-colors ${
+                        timeLeft === 0
+                          ? 'bg-emerald-500/25 border-emerald-300 text-emerald-200'
+                          : timeLeft <= 5
+                          ? 'bg-rose-500/30 border-rose-300 text-rose-100'
+                          : 'bg-sky-500/25 border-sky-300/60 text-white'
+                      }`}
+                    >
+                      {timeLeft > 0 ? `${timeLeft}s` : 'Temps écoulé'}
+                    </span>
+                  )}
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/15 border border-white/20 text-slate-100">
+                    {activeQuestion?.category || 'En cours'}
+                  </span>
+                </div>
               </div>
 
-              <div className="my-auto py-3 flex flex-col justify-center space-y-6 overflow-hidden">
+              <div className="flex-1 min-h-0 py-4 flex flex-col overflow-hidden">
                 {activeGameType === 'petit_bac' ? (
-                  <>
+                  <div className="my-auto space-y-4">
                     <p className="text-sm uppercase tracking-[0.18em] text-sky-200 font-semibold">
                       Lettre tirée
                     </p>
                     <p className="text-7xl md:text-8xl font-semibold tracking-tight text-white">
                       {currentLetter || 'A'}
                     </p>
-                  </>
+                  </div>
                 ) : !quizStarted ? (
-                  <div className="space-y-2 max-w-2xl">
+                  <div className="my-auto space-y-2 max-w-2xl">
                     <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white leading-tight">
                       Prêt pour le Quiz ?
                     </h1>
                   </div>
                 ) : !activeQuestion ? (
-                  <div className="space-y-2">
+                  <div className="my-auto space-y-2">
                     <h1 className="text-3xl md:text-4xl font-bold text-white">
                       Aucune question disponible
                     </h1>
                   </div>
                 ) : (
-                  <div className="space-y-5 h-full flex flex-col justify-between">
-                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white leading-snug">
-                      {activeQuestion.question}
-                    </h1>
+                  <div className="flex-1 min-h-0 flex flex-col justify-between gap-4">
+                    <div className="flex-1 min-h-0 flex items-start pt-1">
+                      <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white leading-snug line-clamp-4">
+                        {activeQuestion.question}
+                      </h1>
+                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
+                    <div className="mt-auto shrink-0 grid grid-cols-1 sm:grid-cols-2 grid-rows-2 gap-4 h-52 md:h-60">
                       {activeQuestion.options.map((opt, i) => {
                         const style = ANSWER_TILE_STYLES[i] ?? ANSWER_TILE_STYLES[0]
+                        const isCorrect = i === activeQuestion.correctIndex
+                        const isDimmed = isTimeUp && !isCorrect
+                        const isHighlighted = isTimeUp && isCorrect
+
                         return (
                           <div
                             key={`${activeQuestion.id}-${i}`}
                             style={{
                               backgroundColor: style.bg,
-                              borderColor: style.border,
+                              borderColor: isHighlighted ? '#ffffff' : style.border,
                               color: style.text,
                             }}
-                            className="p-5 md:p-6 rounded-[24px] border-2 flex items-center gap-4 shadow-lg"
+                            className={`h-full px-5 py-4 rounded-[24px] flex items-center gap-4 transition-all duration-300 ${
+                              isHighlighted
+                                ? 'border-4 ring-4 ring-white/85 shadow-[0_0_40px_rgba(255,255,255,0.65)] scale-[1.015]'
+                                : 'border-2 shadow-lg'
+                            } ${isDimmed ? 'opacity-30 grayscale-[35%]' : 'opacity-100'}`}
                           >
                             <span
                               style={{
@@ -681,7 +828,7 @@ export default function TvPage() {
                             >
                               {style.letter}
                             </span>
-                            <span className="text-xl md:text-2xl font-extrabold leading-tight break-words">
+                            <span className="text-xl md:text-2xl font-extrabold leading-tight line-clamp-2">
                               {opt}
                             </span>
                           </div>
@@ -716,7 +863,8 @@ export default function TvPage() {
                       <button
                         type="button"
                         onClick={handleNextQuestion}
-                        className="tvos-btn px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold shadow-[0_14px_30px_-8px_rgba(14,165,233,0.65)] cursor-pointer"
+                        disabled={timeLeft > 0}
+                        className="tvos-btn px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:bg-white/10 disabled:text-slate-400 disabled:border disabled:border-white/15 disabled:shadow-none disabled:cursor-not-allowed text-white text-sm font-semibold shadow-[0_14px_30px_-8px_rgba(14,165,233,0.65)] cursor-pointer"
                       >
                         {isLastQuestion ? 'Recommencer' : 'Suivante'}
                       </button>
