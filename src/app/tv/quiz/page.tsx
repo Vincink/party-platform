@@ -438,83 +438,86 @@ export default function TvQuizPage() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-extrabold uppercase tracking-[0.14em] bg-white/[0.14] border border-white/25 text-white tabular-nums">
-            Chrono : {timeLeft}s
-          </span>
-          <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
-            Question {questionIndex + 1} / {BASE_QUESTIONS.length}
-          </span>
-        </div>
+        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
+          Question {questionIndex + 1} / {BASE_QUESTIONS.length}
+        </span>
       </header>
 
       <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-stretch">
-        {/* Zone principale : Question & propositions */}
+        {/* Zone principale : Question + Chrono en haut à droite + Cases réponse calées en bas */}
         <div className="h-full min-h-0 p-6 md:p-8 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-5">
-          <div className="space-y-2 shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-              {currentQuestion.category}
+          <div className="flex items-start justify-between gap-4 shrink-0">
+            <div className="space-y-2 min-w-0 flex-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+                {currentQuestion.category}
+              </span>
+              <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white leading-tight">
+                {currentQuestion.question}
+              </h1>
+            </div>
+
+            <span className="inline-flex items-center px-4 py-2 rounded-2xl text-lg sm:text-xl font-extrabold uppercase tracking-[0.12em] bg-white/[0.14] border border-white/25 text-white tabular-nums shrink-0">
+              {timeLeft}s
             </span>
-            <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white leading-tight">
-              {currentQuestion.question}
-            </h1>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center content-center flex-1 min-h-0">
-            {currentQuestion.options.map((opt, idx) => {
-              const colorStyle = OPTION_STYLES[idx] || OPTION_STYLES[0];
-              const isCorrect = isTimeOver && idx === currentQuestion.correctIndex;
-              const isDimmed = isTimeOver && idx !== currentQuestion.correctIndex;
+          <div className="mt-auto flex flex-col gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {currentQuestion.options.map((opt, idx) => {
+                const colorStyle = OPTION_STYLES[idx] || OPTION_STYLES[0];
+                const isCorrect = isTimeOver && idx === currentQuestion.correctIndex;
+                const isDimmed = isTimeOver && idx !== currentQuestion.correctIndex;
 
-              return (
-                <div
-                  key={opt}
-                  style={{
-                    backgroundColor: colorStyle.bg,
-                    borderColor: isCorrect ? '#ffffff' : colorStyle.border,
-                    opacity: isDimmed ? 0.45 : 1,
-                  }}
-                  className={`h-20 sm:h-24 rounded-[22px] border-2 px-5 flex items-center justify-between gap-3 transition-all duration-300 ${
-                    isCorrect
-                      ? 'ring-4 ring-white shadow-[0_16px_36px_-6px_rgba(255,255,255,0.55)] scale-[1.02]'
-                      : 'shadow-md'
-                  }`}
-                >
-                  <span
-                    style={{ backgroundColor: colorStyle.letterBadgeBg }}
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold text-white shrink-0"
+                return (
+                  <div
+                    key={opt}
+                    style={{
+                      backgroundColor: colorStyle.bg,
+                      borderColor: isCorrect ? '#ffffff' : colorStyle.border,
+                      opacity: isDimmed ? 0.45 : 1,
+                    }}
+                    className={`h-28 sm:h-32 rounded-[24px] border-2 px-5 flex items-center justify-between gap-3 transition-all duration-300 ${
+                      isCorrect
+                        ? 'ring-4 ring-white shadow-[0_16px_36px_-6px_rgba(255,255,255,0.55)] scale-[1.02]'
+                        : 'shadow-md'
+                    }`}
                   >
-                    {String.fromCharCode(65 + idx)}
-                  </span>
+                    <span
+                      style={{ backgroundColor: colorStyle.letterBadgeBg }}
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold text-white shrink-0"
+                    >
+                      {String.fromCharCode(65 + idx)}
+                    </span>
 
-                  <span className="flex-1 text-center text-2xl sm:text-3xl font-bold text-white truncate">
-                    {opt}
-                  </span>
+                    <span className="flex-1 text-center text-2xl sm:text-3xl font-bold text-white truncate">
+                      {opt}
+                    </span>
 
-                  <span className="w-12 shrink-0" aria-hidden="true" />
-                </div>
-              );
-            })}
-          </div>
+                    <span className="w-12 shrink-0" aria-hidden="true" />
+                  </div>
+                );
+              })}
+            </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <button
-              type="button"
-              disabled={timeLeft > 0}
-              onClick={() => void syncQuestionIndex(questionIndex - 1)}
-              className="px-4 py-3 rounded-2xl bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-sm font-semibold text-white cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Précédente
-            </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                disabled={timeLeft > 0}
+                onClick={() => void syncQuestionIndex(questionIndex - 1)}
+                className="px-4 py-3 rounded-2xl bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-sm font-semibold text-white cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Précédente
+              </button>
 
-            <button
-              type="button"
-              disabled={timeLeft > 0}
-              onClick={() => void syncQuestionIndex(questionIndex + 1)}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-sm font-bold cursor-pointer transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Question suivante
-            </button>
+              <button
+                type="button"
+                disabled={timeLeft > 0}
+                onClick={() => void syncQuestionIndex(questionIndex + 1)}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-sm font-bold cursor-pointer transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Question suivante
+              </button>
+            </div>
           </div>
         </div>
 
