@@ -442,7 +442,7 @@ export default function TvPage() {
           </div>
         </div>
 
-        {/* Colonne 2 : Choix du jeu (icônes sans grande case) + bouton Lancer le jeu */}
+        {/* Colonne 2 : Choix du jeu (icônes app iOS/iPadOS compactes) + bouton Lancer le jeu */}
         <div className="h-full min-h-0 p-5 md:p-6 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
           <div className="text-center shrink-0">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
@@ -453,35 +453,37 @@ export default function TvPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5 flex-1 min-h-0">
+          <div className="flex-1 min-h-0 flex flex-col justify-center gap-3.5">
             <button
               type="button"
               onClick={() => void handleSelectGame('quiz')}
-              className={`tvos-card h-full px-5 py-4 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
+              className={`tvos-card w-full px-4 py-3.5 rounded-[22px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'quiz'
                   ? 'bg-sky-400/20 border-sky-300 shadow-[0_14px_32px_-10px_rgba(56,189,248,0.5)]'
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <svg
-                viewBox="0 0 48 48"
-                fill="none"
-                className="w-12 h-12 text-sky-300 shrink-0"
-                aria-hidden="true"
-              >
-                <circle cx="24" cy="24" r="18" stroke="currentColor" strokeWidth="2.6" />
-                <path
-                  d="M19 18.5a5.2 5.2 0 0 1 10 1.8c0 3.4-5 4.5-5 7.7"
-                  stroke="currentColor"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                />
-                <circle cx="24" cy="34.5" r="1.8" fill="currentColor" />
-              </svg>
+              {/* Icône app style iPhone / iPad : Quiz */}
+              <div className="w-14 h-14 rounded-[15px] bg-gradient-to-b from-[#38bdf8] via-[#2563eb] to-[#1d4ed8] shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_8px_18px_-4px_rgba(37,99,235,0.75)] flex items-center justify-center shrink-0">
+                <svg
+                  viewBox="0 0 36 36"
+                  fill="none"
+                  className="w-8 h-8 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12.5 13.5C12.5 10.4624 14.9624 8 18 8C21.0376 8 23.5 10.4624 23.5 13.5C23.5 15.85 21.8 17.5 19.6 18.4C18.6 18.8 18 19.5 18 20.6V21.5"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="18" cy="26.5" r="1.8" fill="currentColor" />
+                </svg>
+              </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-xl font-semibold tracking-tight text-white">
+                  <h3 className="text-lg font-semibold tracking-tight text-white">
                     Quiz
                   </h3>
                   {selectedGame === 'quiz' && (
@@ -499,40 +501,49 @@ export default function TvPage() {
             <button
               type="button"
               onClick={() => void handleSelectGame('petit-bac')}
-              className={`tvos-card h-full px-5 py-4 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
+              className={`tvos-card w-full px-4 py-3.5 rounded-[22px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'petit-bac'
-                  ? 'bg-indigo-400/20 border-cyan-300 shadow-[0_14px_32px_-10px_rgba(99,102,241,0.5)]'
+                  ? 'bg-amber-400/20 border-amber-300 shadow-[0_14px_32px_-10px_rgba(251,191,36,0.45)]'
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <svg
-                viewBox="0 0 48 48"
-                fill="none"
-                className="w-12 h-12 text-cyan-300 shrink-0"
-                aria-hidden="true"
-              >
-                <path
-                  d="M11 12h26M24 12v23M12 39h24"
-                  stroke="currentColor"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M32 22l5.5 5.5M37.5 22L32 27.5"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                />
-              </svg>
+              {/* Icône app style iPhone / iPad : Petit Bac */}
+              <div className="w-14 h-14 rounded-[15px] bg-gradient-to-b from-[#fbbf24] via-[#f97316] to-[#ea580c] shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_8px_18px_-4px_rgba(234,88,12,0.75)] flex items-center justify-center shrink-0">
+                <svg
+                  viewBox="0 0 36 36"
+                  fill="none"
+                  className="w-8 h-8 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M8.5 25L13.2 10.5L17.9 25"
+                    stroke="currentColor"
+                    strokeWidth="2.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M10.1 20.2H16.3"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M21.5 12H28.5M21.5 18H28.5M21.5 24H26.5"
+                    stroke="currentColor"
+                    strokeWidth="2.7"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-xl font-semibold tracking-tight text-white">
+                  <h3 className="text-lg font-semibold tracking-tight text-white">
                     Petit Bac
                   </h3>
                   {selectedGame === 'petit-bac' && (
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] px-2.5 py-0.5 rounded-full bg-cyan-300 text-slate-950">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950">
                       Actif
                     </span>
                   )}
