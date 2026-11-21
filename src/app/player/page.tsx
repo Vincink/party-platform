@@ -113,6 +113,7 @@ function PlayerContent() {
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
   const lockedAnswerRef = useRef<ChoiceKey | null>(null)
   const submittingAnswerRef = useRef<boolean>(false)
+  const lastRoomStatusRef = useRef<string>('')
   const scoreRef = useRef<number>(0)
   const lastTapRef = useRef<number>(0)
 
@@ -258,32 +259,46 @@ function PlayerContent() {
 
   const applyRoomStatus = useCallback(
     (nextStatus: string, roomPin: string, currentPlayerId: number | null) => {
+      const prevStatus = lastRoomStatusRef.current
       setRoomStatus(nextStatus)
 
       const parsedBac = parseBacStatus(nextStatus)
       if (parsedBac) {
         setBacPrompt(parsedBac)
-        resetRoundInputs()
+        if (prevStatus !== nextStatus) {
+          resetRoundInputs()
+        }
+        lastRoomStatusRef.current = nextStatus
         return
       }
 
       if (nextStatus.startsWith('playing')) {
-        resetRoundInputs()
+        if (prevStatus !== nextStatus) {
+          resetRoundInputs()
+        }
       } else if (nextStatus === 'waiting') {
         setBacPrompt(null)
-        resetRoundInputs()
+        if (prevStatus !== nextStatus) {
+          resetRoundInputs()
+        }
       } else if (nextStatus.startsWith('revealed:')) {
-        void refreshRank(roomPin, currentPlayerId)
-        const parts = nextStatus.split(':')
-        const correctLetter = (parts[2] || '') as ChoiceKey | ''
-        const chosen = lockedAnswerRef.current
+        if (prevStatus !== nextStatus) {
+          void refreshRank(roomPin, currentPlayerId)
+          const parts = nextStatus.split(':')
+          const correctLetter = (parts[2] || '') as ChoiceKey | ''
+          const chosen = lockedAnswerRef.current
 
-        if (chosen && correctLetter) {
-          setLastOutcome(chosen === correctLetter ? 'correct' : 'wrong')
+          if (chosen && correctLetter) {
+            setLastOutcome(chosen === correctLetter ? 'correct' : 'wrong')
+          }
         }
       } else if (nextStatus.startsWith('bac_scored:')) {
-        void refreshRank(roomPin, currentPlayerId)
+        if (prevStatus !== nextStatus) {
+          void refreshRank(roomPin, currentPlayerId)
+        }
       }
+
+      lastRoomStatusRef.current = nextStatus
     },
     [refreshRank, resetRoundInputs]
   )
@@ -429,6 +444,8 @@ function PlayerContent() {
       .eq('client_id', clientId)
       .maybeSingle()
 
+    const initialStatus = room.status || 'waiting'
+
     if (existingPlayer) {
       const { error: updErr } = await supabase
         .from('players')
@@ -451,11 +468,13 @@ function PlayerContent() {
 
       lockedAnswerRef.current = restoredAnswer
       submittingAnswerRef.current = false
+      lastRoomStatusRef.current = initialStatus
       setPseudo(cleanPseudo)
       setPlayerId(existingPlayer.id)
       setScore(existingPlayer.score ?? 0)
       setSelectedAnswer(restoredAnswer)
-      setRoomStatus(room.status || 'waiting')
+      setRoomStatus(initialStatus)
+      setBacPrompt(parseBacStatus(initialStatus))
       if (room.game_type === 'petitbac') {
         setGameType('petitbac')
       } else if (room.game_type === 'quiz') {
@@ -488,11 +507,13 @@ function PlayerContent() {
 
     lockedAnswerRef.current = null
     submittingAnswerRef.current = false
+    lastRoomStatusRef.current = initialStatus
     setPseudo(cleanPseudo)
     setPlayerId(inserted.id)
     setScore(inserted.score ?? 0)
     setSelectedAnswer(null)
-    setRoomStatus(room.status || 'waiting')
+    setRoomStatus(initialStatus)
+    setBacPrompt(parseBacStatus(initialStatus))
     if (room.game_type === 'petitbac') {
       setGameType('petitbac')
     } else if (room.game_type === 'quiz') {
