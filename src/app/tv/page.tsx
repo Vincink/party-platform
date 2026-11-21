@@ -442,7 +442,7 @@ export default function TvPage() {
           </div>
         </div>
 
-        {/* Colonne 2 : Choix du jeu (icônes type iPhone) + bouton Lancer le jeu */}
+        {/* Colonne 2 : Choix du jeu (icônes sans grande case) + bouton Lancer le jeu */}
         <div className="h-full min-h-0 p-5 md:p-6 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
           <div className="text-center shrink-0">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
@@ -463,23 +463,21 @@ export default function TvPage() {
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <div className="w-14 h-14 rounded-[18px] bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_8px_20px_-4px_rgba(56,189,248,0.65)] ring-1 ring-white/40 flex items-center justify-center shrink-0">
-                <svg
-                  viewBox="0 0 32 32"
-                  fill="none"
-                  className="w-7 h-7 text-white"
-                  aria-hidden="true"
-                >
-                  <circle cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.3" />
-                  <path
-                    d="M12.8 12.6a3.3 3.3 0 0 1 6.4 1.1c0 2.2-3.2 2.9-3.2 5"
-                    stroke="currentColor"
-                    strokeWidth="2.3"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="16" cy="22.8" r="1.4" fill="currentColor" />
-                </svg>
-              </div>
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                className="w-12 h-12 text-sky-300 shrink-0"
+                aria-hidden="true"
+              >
+                <circle cx="24" cy="24" r="18" stroke="currentColor" strokeWidth="2.6" />
+                <path
+                  d="M19 18.5a5.2 5.2 0 0 1 10 1.8c0 3.4-5 4.5-5 7.7"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                />
+                <circle cx="24" cy="34.5" r="1.8" fill="currentColor" />
+              </svg>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
@@ -507,28 +505,26 @@ export default function TvPage() {
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
               }`}
             >
-              <div className="w-14 h-14 rounded-[18px] bg-gradient-to-br from-indigo-400 to-cyan-500 shadow-[0_8px_20px_-4px_rgba(99,102,241,0.65)] ring-1 ring-white/40 flex items-center justify-center shrink-0">
-                <svg
-                  viewBox="0 0 32 32"
-                  fill="none"
-                  className="w-7 h-7 text-white"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M8.5 9h15M16 9v14.5M9.5 24.5h13"
-                    stroke="currentColor"
-                    strokeWidth="2.3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M20.5 14.5l3 3M23.5 14.5l-3 3"
-                    stroke="currentColor"
-                    strokeWidth="2.1"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                className="w-12 h-12 text-cyan-300 shrink-0"
+                aria-hidden="true"
+              >
+                <path
+                  d="M11 12h26M24 12v23M12 39h24"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M32 22l5.5 5.5M37.5 22L32 27.5"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                />
+              </svg>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
