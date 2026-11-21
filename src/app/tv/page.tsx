@@ -878,7 +878,7 @@ export default function TvPage() {
                               borderColor: isHighlighted ? '#ffffff' : style.border,
                               color: style.text,
                             }}
-                            className={`relative h-full px-6 py-5 rounded-[24px] flex items-center justify-center text-center transition-all duration-300 ${
+                            className={`relative h-full px-5 py-5 rounded-[24px] flex items-center justify-start transition-all duration-300 ${
                               isHighlighted
                                 ? 'border-4 ring-4 ring-white/85 shadow-[0_0_40px_rgba(255,255,255,0.65)] scale-[1.015]'
                                 : 'border-2 shadow-lg'
@@ -889,11 +889,11 @@ export default function TvPage() {
                                 backgroundColor: style.badgeBg,
                                 color: style.badgeText,
                               }}
-                              className="w-10 h-10 md:w-11 md:h-11 rounded-xl text-lg md:text-xl font-extrabold flex items-center justify-center shrink-0 mr-3.5"
+                              className="w-14 h-14 md:w-16 md:h-16 rounded-2xl text-2xl md:text-3xl font-extrabold flex items-center justify-center shrink-0"
                             >
                               {style.letter}
                             </span>
-                            <span className="text-xl md:text-2xl font-extrabold text-white text-center leading-tight line-clamp-2">
+                            <span className="flex-1 px-3 text-2xl md:text-3xl font-extrabold text-white text-center leading-tight line-clamp-2">
                               {opt}
                             </span>
                           </div>
