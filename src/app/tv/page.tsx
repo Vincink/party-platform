@@ -29,7 +29,7 @@ interface PlayerRow {
   client_id: string | null;
 }
 
-function parseConfig(raw: RoomRow['config']): RoomConfig {
+function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   if (!raw) return {};
   if (typeof raw === 'string') {
     try {
@@ -42,7 +42,7 @@ function parseConfig(raw: RoomRow['config']): RoomConfig {
 }
 
 function buildQrMatrix(text: string): boolean[][] {
-  const size = 25; // Version 2-L
+  const size = 25;
   const matrix: boolean[][] = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => false)
   );
@@ -68,7 +68,6 @@ function buildQrMatrix(text: string): boolean[][] {
   placeFinder(0, size - 7);
   placeFinder(size - 7, 0);
 
-  // Motif d'alignement Version 2 à (18, 18)
   for (let r = 16; r <= 20; r++) {
     for (let c = 16; c <= 20; c++) {
       reserved[r][c] = true;
@@ -78,7 +77,6 @@ function buildQrMatrix(text: string): boolean[][] {
     }
   }
 
-  // Lignes de synchronisation (timing)
   for (let i = 0; i < size; i++) {
     if (!reserved[6][i]) {
       reserved[6][i] = true;
@@ -90,11 +88,9 @@ function buildQrMatrix(text: string): boolean[][] {
     }
   }
 
-  // Point sombre fixe Version 2
   reserved[17][8] = true;
   matrix[17][8] = true;
 
-  // Réserver les zones d'information de format
   const formatCoords: Array<[number, number]> = [
     [0, 8],
     [1, 8],
@@ -133,7 +129,6 @@ function buildQrMatrix(text: string): boolean[][] {
   for (const [r, c] of formatCoords) reserved[r][c] = true;
   for (const [r, c] of secondaryFormatCoords) reserved[r][c] = true;
 
-  // Encodage mode octet (0100) + longueur sur 8 bits + données (max 42 octets pour 2-L)
   const payload = text.slice(0, 42);
   const bits: number[] = [0, 1, 0, 0];
   const len = payload.length;
@@ -162,7 +157,6 @@ function buildQrMatrix(text: string): boolean[][] {
     padIdx++;
   }
 
-  // Reed-Solomon GF(256) sur 10 octets de correction
   const exp = new Array<number>(512).fill(0);
   const log = new Array<number>(256).fill(0);
   let x = 1;
@@ -221,7 +215,6 @@ function buildQrMatrix(text: string): boolean[][] {
     goingUp = !goingUp;
   }
 
-  // Format ECC L (01) + Masque 0 (000) -> 0x77c4
   const formatBits = 0x77c4;
   for (let i = 0; i < 15; i++) {
     const bit = ((formatBits >> (14 - i)) & 1) === 1;
