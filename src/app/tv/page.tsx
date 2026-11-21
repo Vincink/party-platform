@@ -38,19 +38,19 @@ const GAME_OPTIONS: {
   id: GameType
   title: string
   subtitle: string
-  icon: string
+  tag: string
 }[] = [
   {
     id: 'quiz',
     title: 'Quiz',
     subtitle: '15 questions • +10 / -5 / -2 pts',
-    icon: '🧠',
+    tag: 'QCM',
   },
   {
     id: 'petitbac',
     title: 'Petit Bac',
     subtitle: `${PETIT_BAC_ROUNDS_PER_GAME} manches • 1 lettre + 1 thème`,
-    icon: '🔤',
+    tag: 'Lettres',
   },
 ]
 
@@ -58,19 +58,19 @@ const THEME_OPTIONS: {
   id: QuizTheme
   title: string
   subtitle: string
-  icon: string
+  tag: string
 }[] = [
   {
     id: 'culture',
     title: 'Culture générale',
     subtitle: `${QUESTIONS.length} questions`,
-    icon: '🌍',
+    tag: 'Général',
   },
   {
     id: 'musique',
     title: 'Musique & Tubes mondiaux',
     subtitle: `${MUSIQUE_QUESTIONS.length} questions • Francophone, TV & classiques`,
-    icon: '🎵',
+    tag: 'Audio',
   },
 ]
 
@@ -83,17 +83,17 @@ const NO_ANSWER_PENALTY = 2
 const TIMER_SOUND_SRC = '/quiz_son.mp3'
 
 const OPTION_STYLES: Record<string, string> = {
-  A: 'bg-rose-600/90 border-rose-400',
-  B: 'bg-blue-600/90 border-blue-400',
-  C: 'bg-amber-500/90 border-amber-300 text-slate-950',
-  D: 'bg-emerald-600/90 border-emerald-400',
+  A: 'bg-rose-500/15 border-rose-400/40 text-rose-100',
+  B: 'bg-sky-500/15 border-sky-400/40 text-sky-100',
+  C: 'bg-amber-400/15 border-amber-300/40 text-amber-100',
+  D: 'bg-emerald-500/15 border-emerald-400/40 text-emerald-100',
 }
 
 const ANSWER_BUBBLE_STYLES: Record<string, string> = {
-  A: 'bg-rose-600 border-rose-300 text-white shadow-[0_0_14px_rgba(225,29,72,0.7)]',
-  B: 'bg-blue-600 border-blue-300 text-white shadow-[0_0_14px_rgba(37,99,235,0.7)]',
-  C: 'bg-amber-400 border-amber-200 text-slate-950 shadow-[0_0_14px_rgba(251,191,36,0.7)]',
-  D: 'bg-emerald-600 border-emerald-300 text-white shadow-[0_0_14px_rgba(5,150,105,0.7)]',
+  A: 'bg-rose-500 border-rose-300 text-white',
+  B: 'bg-sky-500 border-sky-300 text-white',
+  C: 'bg-amber-400 border-amber-200 text-zinc-950',
+  D: 'bg-emerald-500 border-emerald-300 text-white',
 }
 
 function getQuestionsForTheme(theme: QuizTheme): QuizQuestion[] {
@@ -150,24 +150,24 @@ function formatVerdictBadge(entry?: EvaluatedPetitBacEntry, hasRawAnswer = false
   if (verdict === 'unique') {
     return {
       label: 'Unique • +10 pts',
-      className: 'bg-emerald-500/20 border-emerald-400 text-emerald-300',
+      className: 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300',
     }
   }
   if (verdict === 'duplicate') {
     return {
       label: isCloseMatch ? 'Doublon (faute proche) • +5 pts' : 'Doublon • +5 pts',
-      className: 'bg-amber-400/20 border-amber-300 text-amber-200',
+      className: 'bg-amber-400/15 border-amber-300/40 text-amber-200',
     }
   }
   if (verdict === 'rejected') {
     return {
       label: needsManualCheck ? 'Hors liste / À vérifier • 0 pt' : 'Refusé • 0 pt',
-      className: 'bg-rose-500/20 border-rose-400 text-rose-300',
+      className: 'bg-rose-500/15 border-rose-400/40 text-rose-300',
     }
   }
   return {
     label: `Aucune réponse • -${PETIT_BAC_NO_ANSWER_PENALTY} pts`,
-    className: 'bg-slate-800 border-slate-600 text-slate-400',
+    className: 'bg-zinc-800/80 border-white/10 text-zinc-400',
   }
 }
 
@@ -501,7 +501,6 @@ export default function TVPage() {
     }
   }, [])
 
-  // Décompte 3, 2, 1 sans déclaration de fonction imbriquée dans un bloc
   useEffect(() => {
     if (!gameRunning || startCountdown === null || gameFinished) return
 
@@ -948,7 +947,7 @@ export default function TVPage() {
   const isLastBacRound = bacRoundIndex >= bacRounds.length - 1
 
   return (
-    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-hidden select-none">
+    <main className="flex min-h-screen flex-col p-6 md:p-8 bg-zinc-950 text-zinc-100 overflow-hidden select-none font-sans antialiased">
       <style>{`
         html, body {
           overflow: hidden;
@@ -956,11 +955,12 @@ export default function TVPage() {
           touch-action: none;
           -webkit-user-select: none;
           user-select: none;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
         }
         @keyframes slideLeftFade {
           0% {
             opacity: 0;
-            translate: 36px 0;
+            translate: 28px 0;
           }
           100% {
             opacity: 1;
@@ -974,74 +974,90 @@ export default function TVPage() {
         }
       `}</style>
 
-      <div className="max-w-7xl w-full mx-auto space-y-6 flex-1 flex flex-col">
-        <div className="flex items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl">
-          <span className="text-sm font-bold uppercase tracking-widest text-slate-400">
-            Salon Animateur
-          </span>
-          {!gameOpened ? (
-            <span className="text-xl font-black tracking-widest text-indigo-400">
-              PIN : {pin || '----'}
+      <div className="max-w-6xl w-full mx-auto space-y-6 flex-1 flex flex-col">
+        <header className="flex items-center justify-between gap-4 bg-zinc-900/75 backdrop-blur-xl border border-white/10 px-6 py-3.5 rounded-2xl">
+          <div className="flex items-center gap-3">
+            <span className="h-2 w-2 rounded-full bg-sky-400" />
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">
+              Mode TV • Hôte
             </span>
+          </div>
+
+          {!gameOpened ? (
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs uppercase tracking-[0.12em] text-zinc-400 font-medium">
+                Code PIN
+              </span>
+              <span className="text-xl font-semibold tracking-[0.22em] text-white tabular-nums">
+                {pin || '----'}
+              </span>
+            </div>
           ) : (
-            <span className="text-xl font-black tracking-widest text-amber-300">
+            <span className="text-sm font-semibold tracking-wide text-amber-300">
               Partie en cours
             </span>
           )}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setSoundEnabled((prev) => !prev)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                soundEnabled
-                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                  : 'bg-slate-800 border-slate-700 text-slate-400'
-              }`}
-            >
-              {soundEnabled ? '🔊 Son ON' : '🔇 Son OFF'}
-            </button>
-          </div>
-        </div>
+
+          <button
+            type="button"
+            onClick={() => setSoundEnabled((prev) => !prev)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all cursor-pointer ${
+              soundEnabled
+                ? 'bg-white/10 border-white/20 text-white hover:bg-white/15'
+                : 'bg-zinc-900 border-white/10 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {soundEnabled ? 'Audio actif' : 'Audio coupé'}
+          </button>
+        </header>
 
         {dbError && (
-          <div className="p-4 bg-red-500/20 border border-red-500 text-red-300 rounded-xl text-sm font-semibold text-center">
+          <div className="p-4 bg-rose-500/10 border border-rose-400/30 text-rose-200 rounded-2xl text-sm font-medium text-center">
             Erreur Supabase : {dbError}
           </div>
         )}
 
         {!gameOpened ? (
-          <div className="max-w-4xl w-full mx-auto my-auto space-y-6 text-center">
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="max-w-4xl w-full mx-auto my-auto space-y-6">
+            <section className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-7 md:p-8 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="space-y-2 text-center md:text-left">
-                <p className="text-sm uppercase tracking-widest text-slate-400">
-                  Scanne pour rejoindre
+                <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
+                  Connexion des joueurs
                 </p>
-                <div className="text-7xl font-black tracking-widest text-indigo-400">
+                <div className="text-6xl md:text-7xl font-semibold tracking-[0.18em] text-white tabular-nums">
                   {pin || '----'}
                 </div>
-                <p className="text-xs text-slate-400 break-all">
+                <p className="text-xs text-zinc-400 break-all pt-1">
                   {joinUrl || '/player'}
                 </p>
               </div>
 
               {joinUrl ? (
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(joinUrl)}`}
-                  alt="QR Code pour rejoindre la partie"
-                  className="w-40 h-40 md:w-44 md:h-44 bg-white p-2 rounded-2xl shadow-lg shrink-0"
-                />
+                <div className="bg-white p-3 rounded-2xl border border-white/10 shrink-0">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(joinUrl)}`}
+                    alt="QR Code pour rejoindre la partie"
+                    className="w-36 h-36 md:w-40 md:h-40 block"
+                  />
+                </div>
               ) : (
-                <div className="w-40 h-40 md:w-44 md:h-44 bg-slate-800 rounded-2xl flex items-center justify-center text-xs text-slate-400 shrink-0">
-                  QR Code...
+                <div className="w-36 h-36 md:w-40 md:h-40 bg-zinc-800/70 border border-white/10 rounded-2xl flex items-center justify-center text-xs text-zinc-400 shrink-0">
+                  Génération du code
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
-              <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                Choix du jeu
-              </p>
-              <div className="flex flex-wrap justify-center gap-4">
+            <section className="bg-zinc-900/70 backdrop-blur-xl border border-white/10 p-6 rounded-3xl space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
+                  Choisir un mode de jeu
+                </p>
+                <span className="text-xs text-zinc-400">
+                  Sélection active : {activeGameOption.title}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {GAME_OPTIONS.map((game) => {
                   const active = selectedGame === game.id
                   return (
@@ -1049,39 +1065,51 @@ export default function TVPage() {
                       key={game.id}
                       type="button"
                       onClick={() => handleSelectGame(game.id)}
-                      className={`px-6 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all cursor-pointer ${
+                      className={`px-5 py-4 rounded-2xl border flex items-center justify-between gap-4 text-left transition-all cursor-pointer ${
                         active
-                          ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
-                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                          ? 'bg-sky-500/15 border-sky-400/70 text-white'
+                          : 'bg-zinc-900/60 border-white/10 text-zinc-300 hover:bg-zinc-800/60 hover:border-white/20'
                       }`}
                     >
-                      <span className="text-4xl">{game.icon}</span>
-                      <div>
-                        <p className="text-xl font-black">{game.title}</p>
-                        <p className="text-xs text-indigo-200 font-semibold">{game.subtitle}</p>
+                      <div className="space-y-1">
+                        <p className="text-lg font-semibold tracking-tight">{game.title}</p>
+                        <p className="text-xs text-zinc-400">{game.subtitle}</p>
                       </div>
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                          active
+                            ? 'bg-sky-400/20 border-sky-300/40 text-sky-200'
+                            : 'bg-white/5 border-white/10 text-zinc-400'
+                        }`}
+                      >
+                        {game.tag}
+                      </span>
                     </button>
                   )
                 })}
               </div>
-            </div>
+            </section>
 
-            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-6">
-              <h2 className="text-xl font-bold text-indigo-300">
-                Joueurs connectés ({playersList.length})
-              </h2>
+            <section className="bg-zinc-900/70 backdrop-blur-xl border border-white/10 p-6 rounded-3xl space-y-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-300">
+                  Joueurs connectés
+                </h2>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/5 border border-white/10 text-zinc-200 tabular-nums">
+                  {playersList.length}
+                </span>
+              </div>
 
               {playersList.length === 0 ? (
-                <p className="text-slate-500 animate-pulse">
-                  En attente des joueurs sur leur smartphone...
+                <p className="text-sm text-zinc-400 text-center py-4">
+                  En attente des joueurs sur leur smartphone.
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-6 justify-center py-2">
+                <div className="flex flex-wrap gap-3 justify-center py-1">
                   {playersList.map((p) => (
                     <span
                       key={p.id}
-                      style={getPlayerNeonStyle(p.id)}
-                      className="px-6 py-2.5 bg-slate-900/90 border-4 rounded-full font-bold text-xl"
+                      className="px-4 py-2 bg-zinc-900 border border-white/15 rounded-full font-medium text-base text-white"
                     >
                       {getDisplayName(p, playersList)}
                     </span>
@@ -1093,41 +1121,43 @@ export default function TVPage() {
                 <button
                   type="button"
                   onClick={openGame}
-                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
+                  className="w-full py-3.5 bg-sky-500 hover:bg-sky-400 text-zinc-950 font-semibold text-base rounded-2xl transition-all cursor-pointer"
                 >
                   Ouvrir {activeGameOption.title}
                 </button>
               )}
-            </div>
+            </section>
           </div>
         ) : gameFinished ? (
-          <div className="max-w-3xl w-full mx-auto my-auto bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-6">
-            <div className="text-center space-y-2">
-              <p className="text-xs uppercase tracking-widest text-amber-400 font-bold">
-                Fin de la partie ({activeGameOption.title})
+          <div className="max-w-3xl w-full mx-auto my-auto bg-zinc-900/80 backdrop-blur-xl border border-white/10 p-8 rounded-3xl space-y-6">
+            <div className="text-center space-y-1.5">
+              <p className="text-xs uppercase tracking-[0.14em] text-amber-300 font-semibold">
+                Fin de la partie • {activeGameOption.title}
               </p>
-              <h1 className="text-4xl md:text-5xl font-black">Classement final</h1>
+              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white">
+                Classement final
+              </h1>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-3">
               {rankedPlayers.map(({ player: p, rank }) => {
                 const theme = getPlayerColorTheme(p.id)
                 return (
                   <div
                     key={p.id}
-                    style={getPlayerNeonStyle(p.id)}
-                    className="bg-slate-900/90 border-4 rounded-3xl px-6 py-4 flex items-center justify-between gap-4"
+                    className="bg-zinc-950/70 border border-white/10 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4"
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <span className={`text-3xl font-black shrink-0 ${theme.badgeClass}`}>
+                      <span className={`text-lg font-semibold shrink-0 tabular-nums ${theme.badgeClass}`}>
                         #{rank}
                       </span>
-                      <span className="text-3xl md:text-4xl font-black truncate">
+                      <span className="text-xl md:text-2xl font-semibold text-white truncate">
                         {getDisplayName(p, playersList)}
                       </span>
                     </div>
-                    <span className="text-3xl md:text-4xl font-black text-white shrink-0">
-                      {p.score ?? 0} <span className="text-xl font-bold text-slate-400">pts</span>
+                    <span className="text-2xl md:text-3xl font-semibold text-white shrink-0 tabular-nums">
+                      {p.score ?? 0}{' '}
+                      <span className="text-sm font-medium text-zinc-400">pts</span>
                     </span>
                   </div>
                 )
@@ -1137,33 +1167,33 @@ export default function TVPage() {
             <button
               type="button"
               onClick={replayGame}
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xl rounded-2xl transition-all shadow-lg cursor-pointer"
+              className="w-full py-3.5 bg-sky-500 hover:bg-sky-400 text-zinc-950 font-semibold text-base rounded-2xl transition-all cursor-pointer"
             >
-              🔄 Rejouer
+              Rejouer
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 relative">
             {startCountdown !== null && startCountdown > 0 && (
-              <div className="fixed inset-0 z-50 bg-slate-950/90 flex flex-col items-center justify-center pointer-events-none select-none">
+              <div className="fixed inset-0 z-50 bg-zinc-950/90 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none select-none">
                 <span
                   key={`countdown-${startCountdown}`}
                   style={{ animationDuration: '350ms', animationDelay: '0ms' }}
-                  className="anim-slide-left text-[11rem] md:text-[15rem] leading-none font-black text-indigo-400 drop-shadow-[0_0_50px_rgba(129,140,248,0.75)] tabular-nums"
+                  className="anim-slide-left text-[10rem] md:text-[14rem] leading-none font-semibold text-white tabular-nums"
                 >
                   {startCountdown}
                 </span>
               </div>
             )}
 
-            <div className="lg:col-span-7 space-y-6">
+            <div className="lg:col-span-7 space-y-5">
               {!gameRunning ? (
-                <div className="bg-slate-900 border border-slate-800 p-8 md:p-10 rounded-3xl shadow-2xl text-center space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
-                      {activeGameOption.title} ouvert — prêt à démarrer
+                <div className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-8 rounded-3xl text-center space-y-6">
+                  <div className="space-y-1.5">
+                    <p className="text-xs uppercase tracking-[0.14em] text-sky-300 font-semibold">
+                      {activeGameOption.title} • Prêt
                     </p>
-                    <h1 className="text-3xl md:text-4xl font-black">
+                    <h1 className="text-3xl font-semibold tracking-tight text-white">
                       {playersList.length} joueur{playersList.length > 1 ? 's' : ''} dans le salon
                     </h1>
                   </div>
@@ -1171,10 +1201,10 @@ export default function TVPage() {
                   {selectedGame === 'quiz' ? (
                     <>
                       <div className="space-y-3">
-                        <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                          Choix du thème
+                        <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
+                          Thème du Quiz
                         </p>
-                        <div className="flex flex-wrap justify-center gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                           {THEME_OPTIONS.map((theme) => {
                             const active = selectedTheme === theme.id
                             return (
@@ -1182,69 +1212,71 @@ export default function TVPage() {
                                 key={theme.id}
                                 type="button"
                                 onClick={() => handleSelectTheme(theme.id)}
-                                className={`px-5 py-3.5 rounded-2xl border-2 flex items-center gap-3 text-left transition-all cursor-pointer ${
+                                className={`px-4 py-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all cursor-pointer ${
                                   active
-                                    ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
-                                    : 'bg-slate-950/70 border-slate-700 text-slate-300 hover:border-slate-500'
+                                    ? 'bg-sky-500/15 border-sky-400/70 text-white'
+                                    : 'bg-zinc-950/60 border-white/10 text-zinc-300 hover:bg-zinc-800/60'
                                 }`}
                               >
-                                <span className="text-3xl">{theme.icon}</span>
-                                <div>
-                                  <p className="text-lg font-black">{theme.title}</p>
-                                  <p className="text-xs text-indigo-200 font-semibold">{theme.subtitle}</p>
+                                <div className="space-y-0.5">
+                                  <p className="text-base font-semibold">{theme.title}</p>
+                                  <p className="text-xs text-zinc-400">{theme.subtitle}</p>
                                 </div>
+                                <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
+                                  {theme.tag}
+                                </span>
                               </button>
                             )
                           })}
                         </div>
                       </div>
 
-                      <p className="text-slate-400 text-base">
-                        Thème sélectionné : <span className="text-white font-bold">{activeThemeOption.title}</span> — {QUESTIONS_PER_GAME} questions aléatoires, victoire au plus de points.
+                      <p className="text-sm text-zinc-400">
+                        Thème sélectionné : <span className="text-white font-medium">{activeThemeOption.title}</span> • {QUESTIONS_PER_GAME} questions aléatoires.
                       </p>
                     </>
                   ) : (
-                    <p className="text-slate-400 text-base">
-                      {PETIT_BAC_ROUNDS_PER_GAME} manches • 1 lettre + 1 thème par manche • Unique +10, Doublon +5 (tolérance orthographique), Refusé 0, Vide -2.
+                    <p className="text-sm text-zinc-400">
+                      {PETIT_BAC_ROUNDS_PER_GAME} manches • 1 lettre et 1 thème par manche • Unique +10, Doublon +5, Refusé 0, Vide -2.
                     </p>
                   )}
                 </div>
               ) : selectedGame === 'quiz' ? (
                 startCountdown === null && (
                   <>
-                    <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center overflow-hidden">
+                    <div className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-7 rounded-3xl space-y-4 text-center overflow-hidden">
                       <div className="flex items-center justify-between gap-4">
                         <p
                           key={`label-${questionIndex}`}
                           style={{ animationDuration: '350ms', animationDelay: '0ms' }}
-                          className="anim-slide-left text-xs uppercase tracking-widest text-indigo-400 font-bold"
+                          className="anim-slide-left text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold tabular-nums"
                         >
                           Question {questionIndex + 1} / {deckQuestions.length}
                         </p>
 
                         <div
-                          className={`px-4 py-1.5 rounded-full font-black text-2xl tabular-nums border-2 transition-all ${
+                          className={`px-4 py-1 rounded-full font-semibold text-xl tabular-nums border transition-all ${
                             revealAnswers
-                              ? 'bg-slate-800 border-slate-700 text-slate-400'
+                              ? 'bg-zinc-800 border-white/10 text-zinc-400'
                               : timeLeft <= 5
-                              ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.75)]'
-                              : 'bg-indigo-600/30 border-indigo-400 text-indigo-200'
+                              ? 'bg-rose-500/20 border-rose-400/60 text-rose-200'
+                              : 'bg-white/5 border-white/15 text-white'
                           }`}
                         >
-                          {revealAnswers ? 'Temps écoulé' : `${timeLeft}s`}
+                          {revealAnswers ? 'Terminé' : `${timeLeft}s`}
                         </div>
                       </div>
 
                       <h1
                         key={`text-${questionIndex}`}
                         style={{ animationDuration: '400ms', animationDelay: '320ms' }}
-                        className="anim-slide-left text-3xl md:text-4xl font-black leading-tight"
+                        className="anim-slide-left text-2xl md:text-4xl font-semibold tracking-tight leading-snug text-white"
                       >
                         {currentQuestion.question}
                       </h1>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-left">
                       {(['A', 'B', 'C', 'D'] as const).map((key, optIdx) => {
                         const isCorrect = revealAnswers && currentQuestion.correct === key
                         const isDimmed = revealAnswers && currentQuestion.correct !== key
@@ -1254,20 +1286,20 @@ export default function TVPage() {
                           <div
                             key={`${questionIndex}-${key}`}
                             style={{ animationDuration: '380ms', animationDelay: `${optionDelay}ms` }}
-                            className={`anim-slide-left p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${
+                            className={`anim-slide-left p-4 rounded-2xl border flex items-center gap-4 transition-all duration-300 ${
                               OPTION_STYLES[key]
                             } ${
                               isCorrect
-                                ? 'scale-[1.05] brightness-125 shadow-[0_0_45px_rgba(255,255,255,0.5)] opacity-100 z-10'
+                                ? 'ring-2 ring-white/70 scale-[1.02] opacity-100'
                                 : isDimmed
-                                ? 'opacity-25 scale-[0.96] grayscale'
+                                ? 'opacity-30'
                                 : ''
                             }`}
                           >
-                            <span className="w-12 h-12 rounded-xl bg-black/25 flex items-center justify-center font-black text-2xl shrink-0">
+                            <span className="w-10 h-10 rounded-xl bg-black/30 border border-white/15 flex items-center justify-center font-semibold text-lg shrink-0">
                               {key}
                             </span>
-                            <span className="text-2xl font-bold leading-snug">
+                            <span className="text-lg md:text-xl font-medium leading-snug">
                               {currentQuestion.options[key]}
                             </span>
                           </div>
@@ -1278,68 +1310,68 @@ export default function TVPage() {
                 )
               ) : (
                 startCountdown === null && currentBacRound && (
-                  <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
+                  <div className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-6 md:p-7 rounded-3xl space-y-6">
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                      <span className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold tabular-nums">
                         Manche {bacRoundIndex + 1} / {bacRounds.length} • Petit Bac
                       </span>
                       <div
-                        className={`px-4 py-1.5 rounded-full font-black text-2xl tabular-nums border-2 transition-all ${
+                        className={`px-4 py-1 rounded-full font-semibold text-xl tabular-nums border transition-all ${
                           bacPhase !== 'playing'
-                            ? 'bg-slate-800 border-slate-700 text-slate-400'
+                            ? 'bg-zinc-800 border-white/10 text-zinc-400'
                             : bacTimeLeft <= 5
-                            ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.75)]'
-                            : 'bg-indigo-600/30 border-indigo-400 text-indigo-200'
+                            ? 'bg-rose-500/20 border-rose-400/60 text-rose-200'
+                            : 'bg-white/5 border-white/15 text-white'
                         }`}
                       >
                         {bacPhase === 'playing' ? `${bacTimeLeft}s` : 'Arbitrage'}
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 bg-slate-950/70 border border-slate-800 p-6 rounded-2xl">
-                      <div className="w-24 h-24 rounded-3xl bg-indigo-600/30 border-4 border-indigo-400 flex items-center justify-center text-6xl font-black text-indigo-300 shrink-0">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 bg-zinc-950/70 border border-white/10 p-6 rounded-2xl">
+                      <div className="w-24 h-24 rounded-3xl bg-sky-500/15 border border-sky-400/40 flex items-center justify-center text-6xl font-semibold text-sky-200 shrink-0">
                         {currentBacRound.letter}
                       </div>
                       <div className="text-center sm:text-left space-y-1">
-                        <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                          Thème à trouver
+                        <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
+                          Thème
                         </p>
-                        <h1 className="text-3xl md:text-4xl font-black text-white">
+                        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white">
                           {currentBacRound.category}
                         </h1>
                       </div>
                     </div>
 
                     {bacPhase === 'playing' ? (
-                      <div className="text-center py-4 space-y-2">
-                        <p className="text-xl font-bold text-slate-200">
-                          Les joueurs saisissent leur mot sur leur téléphone...
+                      <div className="text-center py-3 space-y-3">
+                        <p className="text-base font-medium text-zinc-300">
+                          Saisie en cours sur les smartphones.
                         </p>
                         <button
                           type="button"
                           onClick={() => void triggerBacReveal()}
-                          className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm rounded-xl transition-all cursor-pointer"
+                          className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer"
                         >
-                          Révéler les réponses maintenant
+                          Révéler maintenant
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                            Réponses & arbitrage en 1 clic
+                          <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
+                            Réponses et arbitrage
                           </p>
                           {bacPhase === 'review' && (
                             <button
                               type="button"
                               onClick={() => void applyBacRoundScores()}
-                              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm rounded-xl transition-all cursor-pointer"
+                              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs rounded-xl transition-all cursor-pointer"
                             >
-                              ✓ Valider les points
+                              Valider les points
                             </button>
                           )}
                           {bacPhase === 'applied' && (
-                            <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
                               Points attribués
                             </span>
                           )}
@@ -1355,20 +1387,20 @@ export default function TVPage() {
                             return (
                               <div
                                 key={p.id}
-                                className="bg-slate-950/80 border border-slate-800 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                                className="bg-zinc-950/75 border border-white/10 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
                               >
                                 <div className="min-w-0">
-                                  <p className="text-sm font-bold text-slate-400">
+                                  <p className="text-xs font-medium text-zinc-400">
                                     {getDisplayName(p, playersList)}
                                   </p>
-                                  <p className="text-2xl font-black text-white truncate">
+                                  <p className="text-xl font-semibold text-white truncate">
                                     {hasRawAnswer ? p.answer!.trim() : '—'}
                                   </p>
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span
-                                    className={`px-3 py-1 rounded-full border text-xs font-black ${badge.className}`}
+                                    className={`px-3 py-1 rounded-full border text-xs font-medium ${badge.className}`}
                                   >
                                     {badge.label}
                                   </span>
@@ -1378,10 +1410,10 @@ export default function TVPage() {
                                       <button
                                         type="button"
                                         onClick={() => handleSetBacVerdict(p.id, 'unique')}
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-black border cursor-pointer ${
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
                                           verdict === 'unique'
-                                            ? 'bg-emerald-500 border-emerald-300 text-slate-950'
-                                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                                            ? 'bg-emerald-500 border-emerald-400 text-zinc-950'
+                                            : 'bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800'
                                         }`}
                                       >
                                         Unique
@@ -1389,10 +1421,10 @@ export default function TVPage() {
                                       <button
                                         type="button"
                                         onClick={() => handleSetBacVerdict(p.id, 'duplicate')}
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-black border cursor-pointer ${
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
                                           verdict === 'duplicate'
-                                            ? 'bg-amber-400 border-amber-200 text-slate-950'
-                                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                                            ? 'bg-amber-400 border-amber-300 text-zinc-950'
+                                            : 'bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800'
                                         }`}
                                       >
                                         Doublon
@@ -1400,10 +1432,10 @@ export default function TVPage() {
                                       <button
                                         type="button"
                                         onClick={() => handleSetBacVerdict(p.id, 'rejected')}
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-black border cursor-pointer ${
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
                                           verdict === 'rejected'
-                                            ? 'bg-rose-600 border-rose-400 text-white'
-                                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                                            ? 'bg-rose-500 border-rose-400 text-white'
+                                            : 'bg-zinc-900 border-white/10 text-zinc-300 hover:bg-zinc-800'
                                         }`}
                                       >
                                         Refusé
@@ -1421,37 +1453,37 @@ export default function TVPage() {
                 )
               )}
 
-              <div className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+              <div className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                   {!gameRunning ? (
                     <>
                       <button
                         type="button"
                         onClick={() => void startGame()}
-                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                        className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-zinc-950 font-semibold text-sm rounded-xl transition-all cursor-pointer"
                       >
-                        Démarrer le jeu
+                        Démarrer la partie
                       </button>
                       <button
                         type="button"
                         onClick={() => void backToGameSelection()}
-                        className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-lg rounded-xl transition-all cursor-pointer"
+                        className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-zinc-200 font-medium text-sm rounded-xl transition-all cursor-pointer"
                       >
-                        Sélection du jeu
+                        Changer de jeu
                       </button>
                     </>
                   ) : (
                     <button
                       type="button"
                       onClick={() => void stopGame()}
-                      className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                      className="px-5 py-2.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/40 text-rose-200 font-semibold text-sm rounded-xl transition-all cursor-pointer"
                     >
                       Arrêter
                     </button>
                   )}
 
                   {gameRunning && startCountdown === null && (
-                    <span className="text-lg font-bold text-slate-200">
+                    <span className="text-sm font-medium text-zinc-300 tabular-nums">
                       Réponses : {answeredCount} / {playersList.length}
                     </span>
                   )}
@@ -1462,17 +1494,17 @@ export default function TVPage() {
                     <button
                       type="button"
                       onClick={() => void finishGame()}
-                      className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                      className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-sm rounded-xl transition-all cursor-pointer"
                     >
-                      🏆 Voir le podium final
+                      Classement final
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => void nextQuestion()}
-                      className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
+                      className="px-4 py-2.5 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-sm rounded-xl transition-all cursor-pointer"
                     >
-                      Suivante →
+                      Question suivante
                     </button>
                   )
                 )}
@@ -1482,47 +1514,47 @@ export default function TVPage() {
                     <button
                       type="button"
                       onClick={() => void finishGame()}
-                      className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                      className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-sm rounded-xl transition-all cursor-pointer"
                     >
-                      🏆 Voir le podium final
+                      Classement final
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => void nextBacRound()}
-                      className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
+                      className="px-4 py-2.5 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-sm rounded-xl transition-all cursor-pointer"
                     >
-                      Manche suivante →
+                      Manche suivante
                     </button>
                   )
                 )}
               </div>
             </div>
 
-            <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-5 overflow-visible">
-              <h2 className="text-sm uppercase tracking-widest text-indigo-300 font-bold text-center">
+            <aside className="lg:col-span-5 bg-zinc-900/70 backdrop-blur-xl border border-white/10 p-6 rounded-3xl space-y-4">
+              <h2 className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold text-center">
                 Classement en direct
               </h2>
 
-              <div className="space-y-6 py-2">
+              <div className="space-y-3">
                 {rankedPlayers.map(({ player: p, rank }) => {
                   const theme = getPlayerColorTheme(p.id)
                   const answerBubbleStyle =
                     p.answer && ANSWER_BUBBLE_STYLES[p.answer]
                       ? ANSWER_BUBBLE_STYLES[p.answer]
-                      : 'bg-slate-700 border-slate-500 text-white'
+                      : 'bg-zinc-700 border-white/20 text-white'
 
                   return (
                     <div
                       key={p.id}
                       style={getPlayerNeonStyle(p.id)}
-                      className="bg-slate-900/90 border-4 rounded-3xl px-6 py-4 flex items-center justify-between gap-4 transition-all"
+                      className="bg-zinc-950/75 border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 transition-all"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className={`text-2xl font-black shrink-0 ${theme.badgeClass}`}>
+                        <span className={`text-base font-semibold shrink-0 tabular-nums ${theme.badgeClass}`}>
                           #{rank}
                         </span>
-                        <span className="text-3xl md:text-4xl font-black truncate">
+                        <span className="text-xl md:text-2xl font-semibold text-white truncate">
                           {getDisplayName(p, playersList)}
                         </span>
                       </div>
@@ -1532,36 +1564,36 @@ export default function TVPage() {
                           p.answer ? (
                             revealAnswers ? (
                               <span
-                                className={`w-11 h-11 rounded-full border-2 font-black text-2xl flex items-center justify-center shrink-0 ${answerBubbleStyle}`}
+                                className={`w-9 h-9 rounded-full border font-semibold text-base flex items-center justify-center shrink-0 ${answerBubbleStyle}`}
                               >
                                 {p.answer}
                               </span>
                             ) : (
-                              <span className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-black text-lg flex items-center justify-center shrink-0">
-                                ✓
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 font-semibold text-xs shrink-0">
+                                OK
                               </span>
                             )
                           ) : (
-                            <span className="text-xl font-bold text-slate-500 px-2">...</span>
+                            <span className="text-sm font-medium text-zinc-500 px-1.5">...</span>
                           )
                         ) : p.answer?.trim() ? (
-                          <span className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-black text-lg flex items-center justify-center shrink-0">
-                            ✓
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 font-semibold text-xs shrink-0">
+                            OK
                           </span>
                         ) : (
-                          <span className="text-xl font-bold text-slate-500 px-2">...</span>
+                          <span className="text-sm font-medium text-zinc-500 px-1.5">...</span>
                         )}
 
-                        <span className="text-3xl md:text-4xl font-black text-white">
+                        <span className="text-2xl md:text-3xl font-semibold text-white tabular-nums">
                           {p.score ?? 0}{' '}
-                          <span className="text-xl font-bold text-slate-400">pts</span>
+                          <span className="text-xs font-medium text-zinc-400">pts</span>
                         </span>
                       </div>
                     </div>
                   )
                 })}
               </div>
-            </div>
+            </aside>
           </div>
         )}
       </div>
