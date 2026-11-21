@@ -15,6 +15,7 @@ interface Player {
   score: number
   is_connected?: boolean | null
   client_id?: string | null
+  avatar?: string | null
 }
 
 interface Room {
@@ -27,34 +28,31 @@ interface Room {
   config?: Record<string, unknown> | null
 }
 
-interface PlayerColor {
-  bg: string
-  border: string
-  text: string
-  glow: string
-}
-
-const PLAYER_COLORS: PlayerColor[] = [
-  { bg: '#0284c7', border: '#7dd3fc', text: '#ffffff', glow: '0 0 16px rgba(2, 132, 199, 0.55)' },
-  { bg: '#059669', border: '#6ee7b7', text: '#ffffff', glow: '0 0 16px rgba(5, 150, 105, 0.55)' },
-  { bg: '#d97706', border: '#fcd34d', text: '#ffffff', glow: '0 0 16px rgba(217, 119, 6, 0.55)' },
-  { bg: '#7c3aed', border: '#c4b5fd', text: '#ffffff', glow: '0 0 16px rgba(124, 58, 237, 0.55)' },
-  { bg: '#e11d48', border: '#fda4af', text: '#ffffff', glow: '0 0 16px rgba(225, 29, 72, 0.55)' },
-  { bg: '#0d9488', border: '#5eead4', text: '#ffffff', glow: '0 0 16px rgba(13, 148, 136, 0.55)' },
-  { bg: '#c026d3', border: '#f0abfc', text: '#ffffff', glow: '0 0 16px rgba(192, 38, 211, 0.55)' },
-  { bg: '#ea580c', border: '#fdba74', text: '#ffffff', glow: '0 0 16px rgba(234, 88, 12, 0.55)' },
-  { bg: '#4f46e5', border: '#a5b4fc', text: '#ffffff', glow: '0 0 16px rgba(79, 70, 229, 0.55)' },
-  { bg: '#16a34a', border: '#86efac', text: '#ffffff', glow: '0 0 16px rgba(22, 163, 74, 0.55)' },
+const RANDOM_BADGE_COLORS = [
+  '#2563eb', // Bleu roi
+  '#059669', // Vert émeraude
+  '#d97706', // Ambre vif
+  '#7c3aed', // Violet intense
+  '#e11d48', // Rouge framboise
+  '#0891b2', // Cyan soutenu
+  '#c026d3', // Magenta
+  '#ea580c', // Orange brûlé
+  '#4f46e5', // Indigo
+  '#16a34a', // Vert pomme
+  '#db2777', // Rose vif
+  '#0d9488', // Turquoise foncé
 ]
 
-function getPlayerColor(player: Player, index: number): PlayerColor {
+function resolvePlayerColor(player: Player, index: number): string {
+  if (player.avatar && player.avatar.startsWith('#')) {
+    return player.avatar
+  }
   const seed = String(player.client_id ?? player.id ?? player.pseudo ?? index)
   let hash = 0
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   }
-  const paletteIndex = (index + hash) % PLAYER_COLORS.length
-  return PLAYER_COLORS[paletteIndex]
+  return RANDOM_BADGE_COLORS[(hash + index) % RANDOM_BADGE_COLORS.length]
 }
 
 function generateRoomCode(): string {
@@ -475,7 +473,7 @@ export default function TvPage() {
                 ) : (
                   <ul className="space-y-2.5">
                     {players.map((p, idx) => {
-                      const color = getPlayerColor(p, idx)
+                      const colorHex = resolvePlayerColor(p, idx)
                       return (
                         <li
                           key={p.id}
@@ -483,13 +481,8 @@ export default function TvPage() {
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span
-                              style={{
-                                backgroundColor: color.bg,
-                                borderColor: color.border,
-                                color: color.text,
-                                boxShadow: color.glow,
-                              }}
-                              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold border shrink-0"
+                              style={{ backgroundColor: colorHex }}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white border border-white/40 shrink-0 shadow-sm"
                             >
                               {idx + 1}
                             </span>
@@ -624,12 +617,12 @@ export default function TvPage() {
                   <div className="rounded-2xl overflow-hidden border border-white/15 bg-white/[0.05]">
                     <div className="grid grid-cols-12 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-300 bg-white/[0.06] border-b border-white/10">
                       <span className="col-span-2">#</span>
-                      <span className="col-span-7">Joueur</span>
-                      <span className="col-span-3 text-right">Statut</span>
+                      <span className="col-span-6">Joueur</span>
+                      <span className="col-span-4 text-right">Statut</span>
                     </div>
                     <ul className="divide-y divide-white/10">
                       {players.map((p, idx) => {
-                        const color = getPlayerColor(p, idx)
+                        const colorHex = resolvePlayerColor(p, idx)
                         return (
                           <li
                             key={p.id}
@@ -637,29 +630,19 @@ export default function TvPage() {
                           >
                             <span className="col-span-2">
                               <span
-                                style={{
-                                  backgroundColor: color.bg,
-                                  borderColor: color.border,
-                                  color: color.text,
-                                  boxShadow: color.glow,
-                                }}
-                                className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold border"
+                                style={{ backgroundColor: colorHex }}
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white border border-white/40 shadow-sm"
                               >
                                 {idx + 1}
                               </span>
                             </span>
-                            <span className="col-span-7 font-semibold text-white truncate pr-2">
+                            <span className="col-span-6 font-semibold text-white truncate pr-2">
                               {p.pseudo}
                             </span>
-                            <span className="col-span-3 text-right">
+                            <span className="col-span-4 text-right">
                               <span
-                                style={{
-                                  backgroundColor: color.bg,
-                                  borderColor: color.border,
-                                  color: color.text,
-                                  boxShadow: color.glow,
-                                }}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border"
+                                style={{ backgroundColor: colorHex }}
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white border border-white/40 shadow-sm"
                               >
                                 Prêt
                               </span>
