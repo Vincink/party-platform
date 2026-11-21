@@ -14,6 +14,7 @@ interface Player {
   pseudo: string
   score: number
   is_connected?: boolean | null
+  client_id?: string | null
 }
 
 interface Room {
@@ -26,27 +27,34 @@ interface Room {
   config?: Record<string, unknown> | null
 }
 
-const PLAYER_BADGE_STYLES = [
-  'bg-sky-400/25 border-sky-300/45 text-sky-100',
-  'bg-emerald-400/25 border-emerald-300/45 text-emerald-100',
-  'bg-amber-400/25 border-amber-300/45 text-amber-100',
-  'bg-violet-400/25 border-violet-300/45 text-violet-100',
-  'bg-rose-400/25 border-rose-300/45 text-rose-100',
-  'bg-cyan-400/25 border-cyan-300/45 text-cyan-100',
-  'bg-fuchsia-400/25 border-fuchsia-300/45 text-fuchsia-100',
-  'bg-orange-400/25 border-orange-300/45 text-orange-100',
-  'bg-teal-400/25 border-teal-300/45 text-teal-100',
-  'bg-lime-400/25 border-lime-300/45 text-lime-100',
+interface PlayerColor {
+  bg: string
+  border: string
+  text: string
+  glow: string
+}
+
+const PLAYER_COLORS: PlayerColor[] = [
+  { bg: '#0284c7', border: '#7dd3fc', text: '#ffffff', glow: '0 0 16px rgba(2, 132, 199, 0.55)' },
+  { bg: '#059669', border: '#6ee7b7', text: '#ffffff', glow: '0 0 16px rgba(5, 150, 105, 0.55)' },
+  { bg: '#d97706', border: '#fcd34d', text: '#ffffff', glow: '0 0 16px rgba(217, 119, 6, 0.55)' },
+  { bg: '#7c3aed', border: '#c4b5fd', text: '#ffffff', glow: '0 0 16px rgba(124, 58, 237, 0.55)' },
+  { bg: '#e11d48', border: '#fda4af', text: '#ffffff', glow: '0 0 16px rgba(225, 29, 72, 0.55)' },
+  { bg: '#0d9488', border: '#5eead4', text: '#ffffff', glow: '0 0 16px rgba(13, 148, 136, 0.55)' },
+  { bg: '#c026d3', border: '#f0abfc', text: '#ffffff', glow: '0 0 16px rgba(192, 38, 211, 0.55)' },
+  { bg: '#ea580c', border: '#fdba74', text: '#ffffff', glow: '0 0 16px rgba(234, 88, 12, 0.55)' },
+  { bg: '#4f46e5', border: '#a5b4fc', text: '#ffffff', glow: '0 0 16px rgba(79, 70, 229, 0.55)' },
+  { bg: '#16a34a', border: '#86efac', text: '#ffffff', glow: '0 0 16px rgba(22, 163, 74, 0.55)' },
 ]
 
-function getPlayerBadgeClass(player: Player, index: number): string {
-  const seed = String(player.id ?? player.pseudo ?? index)
+function getPlayerColor(player: Player, index: number): PlayerColor {
+  const seed = String(player.client_id ?? player.id ?? player.pseudo ?? index)
   let hash = 0
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   }
-  const paletteIndex = (index + hash) % PLAYER_BADGE_STYLES.length
-  return PLAYER_BADGE_STYLES[paletteIndex]
+  const paletteIndex = (index + hash) % PLAYER_COLORS.length
+  return PLAYER_COLORS[paletteIndex]
 }
 
 function generateRoomCode(): string {
@@ -466,25 +474,31 @@ export default function TvPage() {
                   <p className="text-sm text-slate-300">Aucun joueur connecté.</p>
                 ) : (
                   <ul className="space-y-2.5">
-                    {players.map((p, idx) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/[0.08] border border-white/15"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getPlayerBadgeClass(
-                              p,
-                              idx
-                            )}`}
-                          >
-                            {idx + 1}
-                          </span>
-                          <span className="font-medium text-white truncate">{p.pseudo}</span>
-                        </div>
-                        <span className="font-semibold text-sky-300">{p.score} pts</span>
-                      </li>
-                    ))}
+                    {players.map((p, idx) => {
+                      const color = getPlayerColor(p, idx)
+                      return (
+                        <li
+                          key={p.id}
+                          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/[0.08] border border-white/15"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              style={{
+                                backgroundColor: color.bg,
+                                borderColor: color.border,
+                                color: color.text,
+                                boxShadow: color.glow,
+                              }}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold border shrink-0"
+                            >
+                              {idx + 1}
+                            </span>
+                            <span className="font-medium text-white truncate">{p.pseudo}</span>
+                          </div>
+                          <span className="font-semibold text-sky-300">{p.score} pts</span>
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
               </div>
@@ -615,7 +629,7 @@ export default function TvPage() {
                     </div>
                     <ul className="divide-y divide-white/10">
                       {players.map((p, idx) => {
-                        const badgeClass = getPlayerBadgeClass(p, idx)
+                        const color = getPlayerColor(p, idx)
                         return (
                           <li
                             key={p.id}
@@ -623,7 +637,13 @@ export default function TvPage() {
                           >
                             <span className="col-span-2">
                               <span
-                                className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold border ${badgeClass}`}
+                                style={{
+                                  backgroundColor: color.bg,
+                                  borderColor: color.border,
+                                  color: color.text,
+                                  boxShadow: color.glow,
+                                }}
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold border"
                               >
                                 {idx + 1}
                               </span>
@@ -633,7 +653,13 @@ export default function TvPage() {
                             </span>
                             <span className="col-span-3 text-right">
                               <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badgeClass}`}
+                                style={{
+                                  backgroundColor: color.bg,
+                                  borderColor: color.border,
+                                  color: color.text,
+                                  boxShadow: color.glow,
+                                }}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border"
                               >
                                 Prêt
                               </span>
