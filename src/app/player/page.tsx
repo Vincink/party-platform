@@ -41,7 +41,7 @@ const CHOICES: ChoiceItem[] = [
   { key: 'D', bgClass: 'bg-emerald-600 active:bg-emerald-700' },
 ];
 
-function parseRoomConfig(raw: RoomRow['config']): RoomConfig {
+function parseRoomConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   if (!raw) return {};
   if (typeof raw === 'string') {
     try {
@@ -172,13 +172,16 @@ export default function PlayerPage() {
       setSelectedChoice(null);
 
       if (roomCode && (player?.id || clientId)) {
-        let query = supabase.from('players').update({ answer: null });
-        if (player?.id) {
-          query = query.eq('id', player.id);
-        } else {
-          query = query.eq('room_code', roomCode).eq('client_id', clientId);
-        }
-        void query;
+        const resetAnswer = async () => {
+          let query = supabase.from('players').update({ answer: null });
+          if (player?.id) {
+            query = query.eq('id', player.id);
+          } else {
+            query = query.eq('room_code', roomCode).eq('client_id', clientId);
+          }
+          await query;
+        };
+        void resetAnswer();
       }
     }
   }, [currentQuestionIndex, roomCode, player?.id, clientId]);
