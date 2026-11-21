@@ -37,40 +37,49 @@ interface RawQuestion {
   text?: string
   intitule?: string
   label?: string
-  options?: unknown[]
-  choices?: unknown[]
-  answers?: unknown[]
-  propositions?: unknown[]
-  reponses?: unknown[]
-  items?: unknown[]
-  a?: string
-  b?: string
-  c?: string
-  d?: string
-  A?: string
-  B?: string
-  C?: string
-  D?: string
-  optionA?: string
-  optionB?: string
-  optionC?: string
-  optionD?: string
-  option1?: string
-  option2?: string
-  option3?: string
-  option4?: string
-  choice1?: string
-  choice2?: string
-  choice3?: string
-  choice4?: string
-  reponse1?: string
-  reponse2?: string
-  reponse3?: string
-  reponse4?: string
-  reponseA?: string
-  reponseB?: string
-  reponseC?: string
-  reponseD?: string
+  options?: unknown
+  choices?: unknown
+  answers?: unknown
+  propositions?: unknown
+  reponses?: unknown
+  choix?: unknown
+  items?: unknown
+  a?: unknown
+  b?: unknown
+  c?: unknown
+  d?: unknown
+  A?: unknown
+  B?: unknown
+  C?: unknown
+  D?: unknown
+  optionA?: unknown
+  optionB?: unknown
+  optionC?: unknown
+  optionD?: unknown
+  option1?: unknown
+  option2?: unknown
+  option3?: unknown
+  option4?: unknown
+  choice1?: unknown
+  choice2?: unknown
+  choice3?: unknown
+  choice4?: unknown
+  reponse1?: unknown
+  reponse2?: unknown
+  reponse3?: unknown
+  reponse4?: unknown
+  reponseA?: unknown
+  reponseB?: unknown
+  reponseC?: unknown
+  reponseD?: unknown
+  choix1?: unknown
+  choix2?: unknown
+  choix3?: unknown
+  choix4?: unknown
+  choixA?: unknown
+  choixB?: unknown
+  choixC?: unknown
+  choixD?: unknown
   correctIndex?: number | string
   correct_index?: number | string
   answerIndex?: number | string
@@ -87,6 +96,7 @@ interface RawQuestion {
   category?: string
   categorie?: string
   theme?: string
+  [key: string]: unknown
 }
 
 interface NormalizedQuestion {
@@ -185,6 +195,7 @@ function extractOptionEntry(entry: unknown): { text: string; isCorrect: boolean 
       obj.answer ??
       obj.option ??
       obj.intitule ??
+      obj.choix ??
       obj.name
     const isCorrect = Boolean(
       obj.isCorrect ?? obj.is_correct ?? obj.correct ?? obj.valid ?? obj.isRight
@@ -195,6 +206,31 @@ function extractOptionEntry(entry: unknown): { text: string; isCorrect: boolean 
     }
   }
   return { text: '', isCorrect: false }
+}
+
+function extractFromObjectMap(source: unknown): string[] {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    return []
+  }
+  const map = source as Record<string, unknown>
+  const keyGroups = [
+    ['A', 'B', 'C', 'D'],
+    ['a', 'b', 'c', 'd'],
+    ['0', '1', '2', '3'],
+    ['1', '2', '3', '4'],
+  ]
+
+  for (const keys of keyGroups) {
+    const values = keys.map((k) => extractOptionEntry(map[k]).text)
+    if (values.some((v) => v.length > 0)) {
+      return values
+    }
+  }
+
+  return Object.values(map)
+    .map((v) => extractOptionEntry(v).text)
+    .filter((v) => v.length > 0)
+    .slice(0, 4)
 }
 
 function extractOptionsAndCorrect(item: RawQuestion): {
@@ -210,6 +246,7 @@ function extractOptionsAndCorrect(item: RawQuestion): {
     item?.answers ??
     item?.propositions ??
     item?.reponses ??
+    item?.choix ??
     item?.items
 
   if (Array.isArray(arraySource) && arraySource.length > 0) {
@@ -220,8 +257,12 @@ function extractOptionsAndCorrect(item: RawQuestion): {
 
     texts = parsed.map((p) => p.text)
     flaggedCorrectIndex = parsed.findIndex((p) => p.isCorrect)
-  } else {
-    const discreteCandidates = [
+  } else if (arraySource && typeof arraySource === 'object') {
+    texts = extractFromObjectMap(arraySource)
+  }
+
+  if (texts.length === 0) {
+    const discreteCandidates: unknown[][] = [
       [item?.a, item?.b, item?.c, item?.d],
       [item?.A, item?.B, item?.C, item?.D],
       [item?.optionA, item?.optionB, item?.optionC, item?.optionD],
@@ -229,6 +270,8 @@ function extractOptionsAndCorrect(item: RawQuestion): {
       [item?.choice1, item?.choice2, item?.choice3, item?.choice4],
       [item?.reponse1, item?.reponse2, item?.reponse3, item?.reponse4],
       [item?.reponseA, item?.reponseB, item?.reponseC, item?.reponseD],
+      [item?.choix1, item?.choix2, item?.choix3, item?.choix4],
+      [item?.choixA, item?.choixB, item?.choixC, item?.choixD],
     ]
 
     for (const group of discreteCandidates) {
@@ -242,11 +285,33 @@ function extractOptionsAndCorrect(item: RawQuestion): {
     }
   }
 
+  if (texts.length === 0) {
+    for (const [key, val] of Object.entries(item)) {
+      if (
+        ['id', 'question', 'prompt', 'title', 'text', 'intitule', 'label', 'category', 'categorie', 'theme'].includes(
+          key
+        )
+      ) {
+        continue
+      }
+      if (Array.isArray(val) && val.length >= 2) {
+        const cleaned = val
+          .map((entry) => extractOptionEntry(entry).text)
+          .filter((s) => s.length > 0)
+          .slice(0, 4)
+        if (cleaned.length >= 2) {
+          texts = cleaned
+          break
+        }
+      }
+    }
+  }
+
   const fourOptions: [string, string, string, string] = [
-    texts[0] ?? '',
-    texts[1] ?? '',
-    texts[2] ?? '',
-    texts[3] ?? '',
+    texts[0] ?? 'Choix A',
+    texts[1] ?? 'Choix B',
+    texts[2] ?? 'Choix C',
+    texts[3] ?? 'Choix D',
   ]
 
   if (flaggedCorrectIndex >= 0 && flaggedCorrectIndex < 4) {
