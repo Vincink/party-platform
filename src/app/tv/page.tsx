@@ -15,12 +15,13 @@ interface Player {
 }
 
 interface Room {
-  id: string
+  id: string | number
   room_code: string
   status: string
-  mode: string | null
-  current_question: string | null
-  current_letter: string | null
+  game_type: string | null
+  current_game?: string | null
+  current_round?: number | null
+  config?: Record<string, unknown> | null
 }
 
 function generateRoomCode(): string {
@@ -39,6 +40,8 @@ export default function TvPage() {
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<'quiz' | 'petit_bac'>('quiz')
+  const [currentQuestion, setCurrentQuestion] = useState<string | null>(null)
+  const [currentLetter, setCurrentLetter] = useState<string | null>(null)
 
   const createRoom = useCallback(async () => {
     setLoading(true)
@@ -47,7 +50,7 @@ export default function TvPage() {
 
     const { data, error } = await supabase
       .from('rooms')
-      .insert([{ room_code, status: 'waiting', mode: 'quiz' }])
+      .insert([{ room_code, status: 'waiting', game_type: 'quiz' }])
       .select()
       .single()
 
@@ -104,26 +107,43 @@ export default function TvPage() {
 
   const handleStartGame = async () => {
     if (!room?.id) return
-    const updates: Partial<Room> = {
-      status: 'playing',
-      mode: selectedMode,
-    }
+
     if (selectedMode === 'petit_bac') {
       const letters = 'ABCDEFGHIJKLMNOPRST'
-      updates.current_letter = letters[Math.floor(Math.random() * letters.length)]
+      setCurrentLetter(letters[Math.floor(Math.random() * letters.length)])
+      setCurrentQuestion(null)
     } else {
-      updates.current_question = 'Question 1 : Pret pour commencer ?'
+      setCurrentQuestion('Question 1 : Pret pour commencer ?')
+      setCurrentLetter(null)
     }
 
-    await supabase.from('rooms').update(updates).eq('id', room.id)
+    const { data, error } = await supabase
+      .from('rooms')
+      .update({ status: 'playing', game_type: selectedMode })
+      .eq('id', room.id)
+      .select()
+      .single()
+
+    if (!error && data) {
+      setRoom(data)
+    }
   }
 
   const handleResetRoom = async () => {
     if (!room?.id) return
-    await supabase
+    setCurrentQuestion(null)
+    setCurrentLetter(null)
+
+    const { data, error } = await supabase
       .from('rooms')
-      .update({ status: 'waiting', current_question: null, current_letter: null })
+      .update({ status: 'waiting' })
       .eq('id', room.id)
+      .select()
+      .single()
+
+    if (!error && data) {
+      setRoom(data)
+    }
   }
 
   const joinUrl =
@@ -134,6 +154,8 @@ export default function TvPage() {
   const qrCodeSrc = joinUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(joinUrl)}`
     : ''
+
+  const activeGameType = room?.game_type || selectedMode
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-7 md:px-14 md:py-10">
@@ -229,7 +251,7 @@ export default function TvPage() {
             <div className="tvos-card lg:col-span-2 p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-6">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
-                  {room.mode === 'petit_bac' ? 'Petit Bac' : 'Quiz'}
+                  {activeGameType === 'petit_bac' ? 'Petit Bac' : 'Quiz'}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/15 border border-white/20 text-slate-100">
                   En cours
@@ -237,18 +259,18 @@ export default function TvPage() {
               </div>
 
               <div className="space-y-4 my-auto">
-                {room.mode === 'petit_bac' ? (
+                {activeGameType === 'petit_bac' ? (
                   <>
                     <p className="text-sm uppercase tracking-[0.18em] text-sky-200 font-semibold">
                       Lettre tiree
                     </p>
                     <p className="text-7xl md:text-8xl font-semibold tracking-tight text-white">
-                      {room.current_letter || 'A'}
+                      {currentLetter || 'A'}
                     </p>
                   </>
                 ) : (
                   <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-white leading-tight">
-                    {room.current_question || 'Partie en cours'}
+                    {currentQuestion || 'Partie en cours'}
                   </h1>
                 )}
               </div>
