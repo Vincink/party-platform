@@ -6,6 +6,17 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { QUESTIONS, type QuizQuestion } from '@/data/questions'
 import { MUSIQUE_QUESTIONS } from '@/data/questions-musique'
+import {
+  PETIT_BAC_ROUNDS_PER_GAME,
+  PETIT_BAC_DURATION_SECONDS,
+  PETIT_BAC_NO_ANSWER_PENALTY,
+  computePetitBacPoints,
+  evaluatePetitBacAnswers,
+  pickPetitBacRounds,
+  type EvaluatedPetitBacEntry,
+  type PetitBacRound,
+  type PetitBacVerdict,
+} from '@/data/petit-bac'
 import { getPlayerColorTheme, getPlayerNeonStyle } from '@/lib/playerColors'
 
 interface Player {
@@ -20,7 +31,7 @@ interface RankedPlayer {
   rank: number
 }
 
-type GameType = 'quiz'
+type GameType = 'quiz' | 'petitbac'
 type QuizTheme = 'culture' | 'musique'
 
 const GAME_OPTIONS: {
@@ -34,6 +45,12 @@ const GAME_OPTIONS: {
     title: 'Quiz',
     subtitle: '15 questions • +10 / -5 / -2 pts',
     icon: '🧠',
+  },
+  {
+    id: 'petitbac',
+    title: 'Petit Bac',
+    subtitle: `${PETIT_BAC_ROUNDS_PER_GAME} manches • 1 lettre + 1 thème`,
+    icon: '🔤',
   },
 ]
 
@@ -125,6 +142,31 @@ function computeDenseRanks(players: Player[]): RankedPlayer[] {
   return result
 }
 
+function formatVerdictBadge(verdict: PetitBacVerdict, isCloseMatch: boolean) {
+  if (verdict === 'unique') {
+    return {
+      label: 'Unique • +10 pts',
+      className: 'bg-emerald-500/20 border-emerald-400 text-emerald-300',
+    }
+  }
+  if (verdict === 'duplicate') {
+    return {
+      label: isCloseMatch ? 'Doublon (faute proche) • +5 pts' : 'Doublon • +5 pts',
+      className: 'bg-amber-400/20 border-amber-300 text-amber-200',
+    }
+  }
+  if (verdict === 'rejected') {
+    return {
+      label: 'Refusé • 0 pt',
+      className: 'bg-rose-500/20 border-rose-400 text-rose-300',
+    }
+  }
+  return {
+    label: `Aucune réponse • -${PETIT_BAC_NO_ANSWER_PENALTY} pts`,
+    className: 'bg-slate-800 border-slate-600 text-slate-400',
+  }
+}
+
 export default function TVPage() {
   const [pin, setPin] = useState<string>('')
   const [joinUrl, setJoinUrl] = useState<string>('')
@@ -137,6 +179,8 @@ export default function TVPage() {
   const [gameRunning, setGameRunning] = useState<boolean>(false)
   const [startCountdown, setStartCountdown] = useState<number | null>(null)
   const [gameFinished, setGameFinished] = useState<boolean>(false)
+
+  // États Quiz
   const [deckQuestions, setDeckQuestions] = useState<QuizQuestion[]>(() =>
     pickRandomQuestions('culture')
   )
@@ -145,15 +189,30 @@ export default function TVPage() {
   const [scoredQuestionIndex, setScoredQuestionIndex] = useState<number | null>(null)
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_DURATION)
 
+  // États Petit Bac
+  const [bacRounds, setBacRounds] = useState<PetitBacRound[]>(() => pickPetitBacRounds())
+  const [bacRoundIndex, setBacRoundIndex] = useState<number>(0)
+  const [bacTimeLeft, setBacTimeLeft] = useState<number>(PETIT_BAC_DURATION_SECONDS)
+  const [bacPhase, setBacPhase] = useState<'playing' | 'review' | 'applied'>('playing')
+  const [bacEvaluations, setBacEvaluations] = useState<Record<number, EvaluatedPetitBacEntry>>({})
+
   const initialized = useRef(false)
   const pinRef = useRef<string>('')
+  const selectedGameRef = useRef<GameType>('quiz')
   const selectedThemeRef = useRef<QuizTheme>('culture')
   const playersListRef = useRef<Player[]>([])
   const deckQuestionsRef = useRef<QuizQuestion[]>(deckQuestions)
   const questionIndexRef = useRef<number>(0)
   const scoredQuestionIndexRef = useRef<number | null>(null)
   const isRevealingRef = useRef<boolean>(false)
+  const bacRoundsRef = useRef<PetitBacRound[]>(bacRounds)
+  const bacRoundIndexRef = useRef<number>(0)
+  const isBacRevealingRef = useRef<boolean>(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    selectedGameRef.current = selectedGame
+  }, [selectedGame])
 
   useEffect(() => {
     selectedThemeRef.current = selectedTheme
@@ -174,6 +233,14 @@ export default function TVPage() {
   useEffect(() => {
     scoredQuestionIndexRef.current = scoredQuestionIndex
   }, [scoredQuestionIndex])
+
+  useEffect(() => {
+    bacRoundsRef.current = bacRounds
+  }, [bacRounds])
+
+  useEffect(() => {
+    bacRoundIndexRef.current = bacRoundIndex
+  }, [bacRoundIndex])
 
   const stopTimerSound = useCallback(() => {
     const audio = audioRef.current
@@ -204,18 +271,41 @@ export default function TVPage() {
     }
   }, [])
 
-  const isQuestionActive =
-    gameOpened && gameRunning && startCountdown === null && !gameFinished && !revealAnswers
+  const isQuizActive =
+    selectedGame === 'quiz' &&
+    gameOpened &&
+    gameRunning &&
+    startCountdown === null &&
+    !gameFinished &&
+    !revealAnswers
+
+  const isBacPlayingActive =
+    selectedGame === 'petitbac' &&
+    gameOpened &&
+    gameRunning &&
+    startCountdown === null &&
+    !gameFinished &&
+    bacPhase === 'playing'
+
+  const isSoundActive = isQuizActive || isBacPlayingActive
 
   useEffect(() => {
     if (!soundEnabled) {
       stopTimerSound()
-    } else if (isQuestionActive) {
+    } else if (isSoundActive) {
       startTimerSound()
     }
-  }, [soundEnabled, isQuestionActive, stopTimerSound, startTimerSound])
+  }, [soundEnabled, isSoundActive, stopTimerSound, startTimerSound])
 
-  const triggerRevealAndScore = useCallback(async () => {
+  const syncRoomGameType = useCallback(async (roomPin: string, game: GameType) => {
+    if (!roomPin) return
+    await supabase
+      .from('rooms')
+      .update({ game_type: game })
+      .eq('room_code', roomPin)
+  }, [])
+
+  const triggerRevealAndScoreQuiz = useCallback(async () => {
     if (isRevealingRef.current) return
     isRevealingRef.current = true
     stopTimerSound()
@@ -274,6 +364,35 @@ export default function TVPage() {
     isRevealingRef.current = false
   }, [stopTimerSound])
 
+  const triggerBacReveal = useCallback(async () => {
+    if (isBacRevealingRef.current) return
+    isBacRevealingRef.current = true
+    stopTimerSound()
+
+    const currentPin = pinRef.current
+    const roundIdx = bacRoundIndexRef.current
+    const round = bacRoundsRef.current[roundIdx]
+    const currentPlayers = playersListRef.current
+
+    const evaluatedList = evaluatePetitBacAnswers(currentPlayers, round?.letter ?? '')
+    const mapByPlayer: Record<number, EvaluatedPetitBacEntry> = {}
+    for (const item of evaluatedList) {
+      mapByPlayer[item.playerId] = item
+    }
+
+    setBacEvaluations(mapByPlayer)
+    setBacPhase('review')
+
+    if (currentPin) {
+      await supabase
+        .from('rooms')
+        .update({ status: `bac_review:${roundIdx}` })
+        .eq('room_code', currentPin)
+    }
+
+    isBacRevealingRef.current = false
+  }, [stopTimerSound])
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
@@ -289,7 +408,13 @@ export default function TVPage() {
     async function createRoom() {
       const { error } = await supabase
         .from('rooms')
-        .insert([{ room_code: randomPin, status: 'waiting' }])
+        .insert([
+          {
+            room_code: randomPin,
+            status: 'waiting',
+            game_type: selectedGameRef.current,
+          },
+        ])
 
       if (error) {
         console.error('Erreur création room:', error)
@@ -352,13 +477,31 @@ export default function TVPage() {
         if (prev <= 1) {
           window.clearInterval(countdownTimer)
           const currentPin = pinRef.current
-          if (currentPin) {
-            void supabase
-              .from('rooms')
-              .update({ status: 'playing:0' })
-              .eq('room_code', currentPin)
+          const activeGame = selectedGameRef.current
+
+          if (activeGame === 'quiz') {
+            if (currentPin) {
+              void supabase
+                .from('rooms')
+                .update({ status: 'playing:0', game_type: 'quiz' })
+                .eq('room_code', currentPin)
+            }
+            setTimeLeft(QUESTION_DURATION)
+          } else {
+            const firstRound = bacRoundsRef.current[0]
+            if (currentPin && firstRound) {
+              void supabase
+                .from('rooms')
+                .update({
+                  status: `bac_playing:0:${firstRound.letter}:${encodeURIComponent(firstRound.category)}`,
+                  game_type: 'petitbac',
+                })
+                .eq('room_code', currentPin)
+            }
+            setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+            setBacPhase('playing')
           }
-          setTimeLeft(QUESTION_DURATION)
+
           startTimerSound()
           return null
         }
@@ -372,8 +515,10 @@ export default function TVPage() {
   }, [gameRunning, startCountdown, gameFinished, startTimerSound])
 
   useEffect(() => {
-    if (!isQuestionActive) {
-      stopTimerSound()
+    if (!isQuizActive) {
+      if (!isBacPlayingActive) {
+        stopTimerSound()
+      }
       return
     }
 
@@ -383,7 +528,7 @@ export default function TVPage() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           window.clearInterval(timer)
-          void triggerRevealAndScore()
+          void triggerRevealAndScoreQuiz()
           return 0
         }
         return prev - 1
@@ -394,10 +539,42 @@ export default function TVPage() {
       window.clearInterval(timer)
       stopTimerSound()
     }
-  }, [isQuestionActive, questionIndex, triggerRevealAndScore, startTimerSound, stopTimerSound])
+  }, [isQuizActive, isBacPlayingActive, questionIndex, triggerRevealAndScoreQuiz, startTimerSound, stopTimerSound])
+
+  useEffect(() => {
+    if (!isBacPlayingActive) {
+      if (!isQuizActive) {
+        stopTimerSound()
+      }
+      return
+    }
+
+    startTimerSound()
+
+    const timer = window.setInterval(() => {
+      setBacTimeLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer)
+          void triggerBacReveal()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timer)
+      stopTimerSound()
+    }
+  }, [isBacPlayingActive, isQuizActive, bacRoundIndex, triggerBacReveal, startTimerSound, stopTimerSound])
 
   function handleSelectGame(game: GameType) {
+    selectedGameRef.current = game
     setSelectedGame(game)
+    const currentPin = pin || pinRef.current
+    if (currentPin) {
+      void syncRoomGameType(currentPin, game)
+    }
   }
 
   function handleSelectTheme(theme: QuizTheme) {
@@ -410,18 +587,36 @@ export default function TVPage() {
 
   function openGame() {
     stopTimerSound()
-    const picked = pickRandomQuestions(selectedThemeRef.current)
-    deckQuestionsRef.current = picked
-    setDeckQuestions(picked)
+    const currentPin = pin || pinRef.current
+    const activeGame = selectedGameRef.current
+
+    if (currentPin) {
+      void syncRoomGameType(currentPin, activeGame)
+    }
+
+    if (activeGame === 'quiz') {
+      const picked = pickRandomQuestions(selectedThemeRef.current)
+      deckQuestionsRef.current = picked
+      setDeckQuestions(picked)
+      setQuestionIndex(0)
+      setRevealAnswers(false)
+      setScoredQuestionIndex(null)
+      scoredQuestionIndexRef.current = null
+      setTimeLeft(QUESTION_DURATION)
+    } else {
+      const rounds = pickPetitBacRounds()
+      bacRoundsRef.current = rounds
+      setBacRounds(rounds)
+      setBacRoundIndex(0)
+      setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+      setBacPhase('playing')
+      setBacEvaluations({})
+    }
+
     setGameOpened(true)
     setGameRunning(false)
     setStartCountdown(null)
     setGameFinished(false)
-    setQuestionIndex(0)
-    setRevealAnswers(false)
-    setScoredQuestionIndex(null)
-    scoredQuestionIndexRef.current = null
-    setTimeLeft(QUESTION_DURATION)
   }
 
   async function backToGameSelection() {
@@ -436,6 +631,10 @@ export default function TVPage() {
     scoredQuestionIndexRef.current = null
     setQuestionIndex(0)
     setTimeLeft(QUESTION_DURATION)
+    setBacRoundIndex(0)
+    setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+    setBacPhase('playing')
+    setBacEvaluations({})
     setGameOpened(false)
 
     if (currentPin) {
@@ -445,7 +644,7 @@ export default function TVPage() {
         .eq('session_id', currentPin)
       await supabase
         .from('rooms')
-        .update({ status: 'waiting' })
+        .update({ status: 'waiting', game_type: selectedGameRef.current })
         .eq('room_code', currentPin)
     }
 
@@ -455,14 +654,27 @@ export default function TVPage() {
   async function startGame() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
-    const picked = pickRandomQuestions(selectedThemeRef.current)
-    deckQuestionsRef.current = picked
-    setDeckQuestions(picked)
-    setQuestionIndex(0)
-    setRevealAnswers(false)
-    setScoredQuestionIndex(null)
-    scoredQuestionIndexRef.current = null
-    setTimeLeft(QUESTION_DURATION)
+    const activeGame = selectedGameRef.current
+
+    if (activeGame === 'quiz') {
+      const picked = pickRandomQuestions(selectedThemeRef.current)
+      deckQuestionsRef.current = picked
+      setDeckQuestions(picked)
+      setQuestionIndex(0)
+      setRevealAnswers(false)
+      setScoredQuestionIndex(null)
+      scoredQuestionIndexRef.current = null
+      setTimeLeft(QUESTION_DURATION)
+    } else {
+      const rounds = pickPetitBacRounds()
+      bacRoundsRef.current = rounds
+      setBacRounds(rounds)
+      setBacRoundIndex(0)
+      setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+      setBacPhase('playing')
+      setBacEvaluations({})
+    }
+
     setGameFinished(false)
     setGameRunning(true)
     setStartCountdown(START_COUNTDOWN_SECONDS)
@@ -472,6 +684,10 @@ export default function TVPage() {
         .from('players')
         .update({ answer: null })
         .eq('session_id', currentPin)
+      await supabase
+        .from('rooms')
+        .update({ game_type: activeGame })
+        .eq('room_code', currentPin)
       setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
     }
   }
@@ -482,6 +698,9 @@ export default function TVPage() {
     setGameRunning(false)
     setRevealAnswers(false)
     setTimeLeft(QUESTION_DURATION)
+    setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+    setBacPhase('playing')
+    setBacEvaluations({})
 
     const currentPin = pin || pinRef.current
     if (currentPin) {
@@ -518,6 +737,83 @@ export default function TVPage() {
       .eq('room_code', currentPin)
   }
 
+  function handleSetBacVerdict(playerId: number, verdict: Exclude<PetitBacVerdict, 'empty'>) {
+    setBacEvaluations((prev) => {
+      const existing = prev[playerId]
+      if (!existing || existing.verdict === 'empty') return prev
+      return {
+        ...prev,
+        [playerId]: {
+          ...existing,
+          verdict,
+          pointsDelta: computePetitBacPoints(verdict),
+          isCloseMatch: verdict === 'duplicate' ? existing.isCloseMatch : false,
+        },
+      }
+    })
+  }
+
+  async function applyBacRoundScores() {
+    if (bacPhase !== 'review') return
+    const currentPin = pin || pinRef.current
+    const currentPlayers = playersListRef.current
+
+    const updatedList = await Promise.all(
+      currentPlayers.map(async (p) => {
+        const entry = bacEvaluations[p.id]
+        const delta = entry ? entry.pointsDelta : 0
+        const currentScore = p.score ?? 0
+        const nextScore = Math.max(0, currentScore + delta)
+
+        await supabase
+          .from('players')
+          .update({ score: nextScore })
+          .eq('id', p.id)
+
+        return { ...p, score: nextScore }
+      })
+    )
+
+    setPlayersList(updatedList)
+    setBacPhase('applied')
+
+    if (currentPin) {
+      await supabase
+        .from('rooms')
+        .update({ status: `bac_scored:${bacRoundIndexRef.current}` })
+        .eq('room_code', currentPin)
+    }
+  }
+
+  async function nextBacRound() {
+    stopTimerSound()
+    const currentPin = pin || pinRef.current
+    const nextIdx = Math.min(bacRoundIndexRef.current + 1, bacRoundsRef.current.length - 1)
+    const nextRound = bacRoundsRef.current[nextIdx]
+
+    setBacEvaluations({})
+    setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+    setBacPhase('playing')
+
+    await supabase
+      .from('players')
+      .update({ answer: null })
+      .eq('session_id', currentPin)
+
+    setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
+    setBacRoundIndex(nextIdx)
+
+    if (currentPin && nextRound) {
+      await supabase
+        .from('rooms')
+        .update({
+          status: `bac_playing:${nextIdx}:${nextRound.letter}:${encodeURIComponent(nextRound.category)}`,
+          game_type: 'petitbac',
+        })
+        .eq('room_code', currentPin)
+    }
+  }
+
   async function finishGame() {
     stopTimerSound()
     setStartCountdown(null)
@@ -543,12 +839,17 @@ export default function TVPage() {
 
     await supabase
       .from('rooms')
-      .update({ status: 'waiting' })
+      .update({ status: 'waiting', game_type: selectedGameRef.current })
       .eq('room_code', currentPin)
 
     const picked = pickRandomQuestions(selectedThemeRef.current)
     deckQuestionsRef.current = picked
     setDeckQuestions(picked)
+
+    const rounds = pickPetitBacRounds()
+    bacRoundsRef.current = rounds
+    setBacRounds(rounds)
+
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
     setGameFinished(false)
     setGameOpened(false)
@@ -559,6 +860,10 @@ export default function TVPage() {
     setScoredQuestionIndex(null)
     scoredQuestionIndexRef.current = null
     setTimeLeft(QUESTION_DURATION)
+    setBacRoundIndex(0)
+    setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+    setBacPhase('playing')
+    setBacEvaluations({})
   }
 
   const activeGameOption =
@@ -566,10 +871,12 @@ export default function TVPage() {
   const activeThemeOption =
     THEME_OPTIONS.find((t) => t.id === selectedTheme) || THEME_OPTIONS[0]
   const currentQuestion = deckQuestions[questionIndex]
-  const answeredCount = playersList.filter((p) => Boolean(p.answer)).length
+  const currentBacRound = bacRounds[bacRoundIndex]
+  const answeredCount = playersList.filter((p) => Boolean(p.answer && p.answer.trim())).length
 
   const rankedPlayers = computeDenseRanks(playersList)
-  const isLastQuestion = questionIndex >= deckQuestions.length - 1
+  const isLastQuizQuestion = questionIndex >= deckQuestions.length - 1
+  const isLastBacRound = bacRoundIndex >= bacRounds.length - 1
 
   return (
     <main className="flex min-h-screen flex-col p-6 md:p-8 bg-slate-950 text-white overflow-hidden select-none">
@@ -722,7 +1029,7 @@ export default function TVPage() {
           <div className="max-w-3xl w-full mx-auto my-auto bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-6">
             <div className="text-center space-y-2">
               <p className="text-xs uppercase tracking-widest text-amber-400 font-bold">
-                Fin de la partie ({deckQuestions.length} questions)
+                Fin de la partie ({activeGameOption.title})
               </p>
               <h1 className="text-4xl md:text-5xl font-black">Classement final</h1>
             </div>
@@ -786,40 +1093,48 @@ export default function TVPage() {
                     </h1>
                   </div>
 
-                  <div className="space-y-3">
-                    <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                      Choix du thème
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-3">
-                      {THEME_OPTIONS.map((theme) => {
-                        const active = selectedTheme === theme.id
-                        return (
-                          <button
-                            key={theme.id}
-                            type="button"
-                            onClick={() => handleSelectTheme(theme.id)}
-                            className={`px-5 py-3.5 rounded-2xl border-2 flex items-center gap-3 text-left transition-all cursor-pointer ${
-                              active
-                                ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
-                                : 'bg-slate-950/70 border-slate-700 text-slate-300 hover:border-slate-500'
-                            }`}
-                          >
-                            <span className="text-3xl">{theme.icon}</span>
-                            <div>
-                              <p className="text-lg font-black">{theme.title}</p>
-                              <p className="text-xs text-indigo-200 font-semibold">{theme.subtitle}</p>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  {selectedGame === 'quiz' ? (
+                    <>
+                      <div className="space-y-3">
+                        <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
+                          Choix du thème
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {THEME_OPTIONS.map((theme) => {
+                            const active = selectedTheme === theme.id
+                            return (
+                              <button
+                                key={theme.id}
+                                type="button"
+                                onClick={() => handleSelectTheme(theme.id)}
+                                className={`px-5 py-3.5 rounded-2xl border-2 flex items-center gap-3 text-left transition-all cursor-pointer ${
+                                  active
+                                    ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_24px_rgba(99,102,241,0.45)]'
+                                    : 'bg-slate-950/70 border-slate-700 text-slate-300 hover:border-slate-500'
+                                }`}
+                              >
+                                <span className="text-3xl">{theme.icon}</span>
+                                <div>
+                                  <p className="text-lg font-black">{theme.title}</p>
+                                  <p className="text-xs text-indigo-200 font-semibold">{theme.subtitle}</p>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
 
-                  <p className="text-slate-400 text-base">
-                    Thème sélectionné : <span className="text-white font-bold">{activeThemeOption.title}</span> — {QUESTIONS_PER_GAME} questions aléatoires, victoire au plus de points.
-                  </p>
+                      <p className="text-slate-400 text-base">
+                        Thème sélectionné : <span className="text-white font-bold">{activeThemeOption.title}</span> — {QUESTIONS_PER_GAME} questions aléatoires, victoire au plus de points.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-slate-400 text-base">
+                      {PETIT_BAC_ROUNDS_PER_GAME} manches • 1 lettre + 1 thème par manche • Unique +10, Doublon +5 (tolérance orthographique), Refusé 0, Vide -2.
+                    </p>
+                  )}
                 </div>
-              ) : (
+              ) : selectedGame === 'quiz' ? (
                 startCountdown === null && (
                   <>
                     <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-4 text-center overflow-hidden">
@@ -886,6 +1201,148 @@ export default function TVPage() {
                     </div>
                   </>
                 )
+              ) : (
+                startCountdown === null && currentBacRound && (
+                  <div className="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
+                        Manche {bacRoundIndex + 1} / {bacRounds.length} • Petit Bac
+                      </span>
+                      <div
+                        className={`px-4 py-1.5 rounded-full font-black text-2xl tabular-nums border-2 transition-all ${
+                          bacPhase !== 'playing'
+                            ? 'bg-slate-800 border-slate-700 text-slate-400'
+                            : bacTimeLeft <= 5
+                            ? 'bg-rose-600 border-rose-300 text-white animate-pulse shadow-[0_0_20px_rgba(225,29,72,0.75)]'
+                            : 'bg-indigo-600/30 border-indigo-400 text-indigo-200'
+                        }`}
+                      >
+                        {bacPhase === 'playing' ? `${bacTimeLeft}s` : 'Arbitrage'}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 bg-slate-950/70 border border-slate-800 p-6 rounded-2xl">
+                      <div className="w-24 h-24 rounded-3xl bg-indigo-600/30 border-4 border-indigo-400 flex items-center justify-center text-6xl font-black text-indigo-300 shrink-0">
+                        {currentBacRound.letter}
+                      </div>
+                      <div className="text-center sm:text-left space-y-1">
+                        <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
+                          Thème à trouver
+                        </p>
+                        <h1 className="text-3xl md:text-4xl font-black text-white">
+                          {currentBacRound.category}
+                        </h1>
+                      </div>
+                    </div>
+
+                    {bacPhase === 'playing' ? (
+                      <div className="text-center py-4 space-y-2">
+                        <p className="text-xl font-bold text-slate-200">
+                          Les joueurs saisissent leur mot sur leur téléphone...
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void triggerBacReveal()}
+                          className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm rounded-xl transition-all cursor-pointer"
+                        >
+                          Révéler les réponses maintenant
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">
+                            Réponses & arbitrage en 1 clic
+                          </p>
+                          {bacPhase === 'review' && (
+                            <button
+                              type="button"
+                              onClick={() => void applyBacRoundScores()}
+                              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm rounded-xl transition-all cursor-pointer"
+                            >
+                              ✓ Valider les points
+                            </button>
+                          )}
+                          {bacPhase === 'applied' && (
+                            <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                              Points attribués
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                          {playersList.map((p) => {
+                            const entry = bacEvaluations[p.id]
+                            const verdict = entry?.verdict ?? (p.answer?.trim() ? 'unique' : 'empty')
+                            const badge = formatVerdictBadge(verdict, Boolean(entry?.isCloseMatch))
+
+                            return (
+                              <div
+                                key={p.id}
+                                className="bg-slate-950/80 border border-slate-800 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-slate-400">
+                                    {getDisplayName(p, playersList)}
+                                  </p>
+                                  <p className="text-2xl font-black text-white truncate">
+                                    {p.answer?.trim() ? p.answer.trim() : '—'}
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span
+                                    className={`px-3 py-1 rounded-full border text-xs font-black ${badge.className}`}
+                                  >
+                                    {badge.label}
+                                  </span>
+
+                                  {bacPhase === 'review' && verdict !== 'empty' && (
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetBacVerdict(p.id, 'unique')}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-black border cursor-pointer ${
+                                          verdict === 'unique'
+                                            ? 'bg-emerald-500 border-emerald-300 text-slate-950'
+                                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                                        }`}
+                                      >
+                                        Unique
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetBacVerdict(p.id, 'duplicate')}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-black border cursor-pointer ${
+                                          verdict === 'duplicate'
+                                            ? 'bg-amber-400 border-amber-200 text-slate-950'
+                                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                                        }`}
+                                      >
+                                        Doublon
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetBacVerdict(p.id, 'rejected')}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-black border cursor-pointer ${
+                                          verdict === 'rejected'
+                                            ? 'bg-rose-600 border-rose-400 text-white'
+                                            : 'bg-slate-900 border-slate-700 text-slate-300'
+                                        }`}
+                                      >
+                                        Refusé
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
               )}
 
               <div className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
@@ -924,8 +1381,8 @@ export default function TVPage() {
                   )}
                 </div>
 
-                {gameRunning && startCountdown === null && (
-                  revealAnswers && isLastQuestion ? (
+                {gameRunning && startCountdown === null && selectedGame === 'quiz' && (
+                  revealAnswers && isLastQuizQuestion ? (
                     <button
                       type="button"
                       onClick={() => void finishGame()}
@@ -940,6 +1397,26 @@ export default function TVPage() {
                       className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
                     >
                       Suivante →
+                    </button>
+                  )
+                )}
+
+                {gameRunning && startCountdown === null && selectedGame === 'petitbac' && bacPhase === 'applied' && (
+                  isLastBacRound ? (
+                    <button
+                      type="button"
+                      onClick={() => void finishGame()}
+                      className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-lg rounded-xl transition-all shadow-lg cursor-pointer"
+                    >
+                      🏆 Voir le podium final
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void nextBacRound()}
+                      className="px-5 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-lg rounded-xl transition-all cursor-pointer"
+                    >
+                      Manche suivante →
                     </button>
                   )
                 )}
@@ -975,18 +1452,26 @@ export default function TVPage() {
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        {p.answer ? (
-                          revealAnswers ? (
-                            <span
-                              className={`w-11 h-11 rounded-full border-2 font-black text-2xl flex items-center justify-center shrink-0 ${answerBubbleStyle}`}
-                            >
-                              {p.answer}
-                            </span>
+                        {selectedGame === 'quiz' ? (
+                          p.answer ? (
+                            revealAnswers ? (
+                              <span
+                                className={`w-11 h-11 rounded-full border-2 font-black text-2xl flex items-center justify-center shrink-0 ${answerBubbleStyle}`}
+                              >
+                                {p.answer}
+                              </span>
+                            ) : (
+                              <span className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-black text-lg flex items-center justify-center shrink-0">
+                                ✓
+                              </span>
+                            )
                           ) : (
-                            <span className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-black text-lg flex items-center justify-center shrink-0">
-                              ✓
-                            </span>
+                            <span className="text-xl font-bold text-slate-500 px-2">...</span>
                           )
+                        ) : p.answer?.trim() ? (
+                          <span className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-black text-lg flex items-center justify-center shrink-0">
+                            ✓
+                          </span>
                         ) : (
                           <span className="text-xl font-bold text-slate-500 px-2">...</span>
                         )}
