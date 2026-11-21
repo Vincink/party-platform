@@ -16,7 +16,7 @@ interface Player {
 
 interface Room {
   id: string
-  code: string
+  room_code: string
   status: string
   mode: string | null
   current_question: string | null
@@ -43,11 +43,11 @@ export default function TvPage() {
   const createRoom = useCallback(async () => {
     setLoading(true)
     setErrorMsg(null)
-    const code = generateRoomCode()
+    const room_code = generateRoomCode()
 
     const { data, error } = await supabase
       .from('rooms')
-      .insert([{ code, status: 'waiting', mode: 'quiz' }])
+      .insert([{ room_code, status: 'waiting', mode: 'quiz' }])
       .select()
       .single()
 
@@ -127,8 +127,8 @@ export default function TvPage() {
   }
 
   const joinUrl =
-    typeof window !== 'undefined' && room?.code
-      ? `${window.location.origin}/player?code=${room.code}`
+    typeof window !== 'undefined' && room?.room_code
+      ? `${window.location.origin}/player?code=${room.room_code}`
       : ''
 
   const qrCodeSrc = joinUrl
@@ -187,9 +187,9 @@ export default function TvPage() {
         </span>
 
         <div className="flex items-center gap-3">
-          {room?.code && (
+          {room?.room_code && (
             <span className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.18em] bg-white/[0.14] border border-white/25 text-white backdrop-blur-xl">
-              Code : {room.code}
+              Code : {room.room_code}
             </span>
           )}
           <button
@@ -304,7 +304,7 @@ export default function TvPage() {
                 <div className="p-3 rounded-2xl bg-white">
                   <img
                     src={qrCodeSrc}
-                    alt={`QR Code salon ${room?.code}`}
+                    alt={`QR Code salon ${room?.room_code}`}
                     className="w-40 h-40 md:w-44 md:h-44 object-contain"
                   />
                 </div>
@@ -315,7 +315,7 @@ export default function TvPage() {
                   Code du salon
                 </p>
                 <p className="text-3xl md:text-4xl font-semibold tracking-[0.2em] text-white">
-                  {room?.code}
+                  {room?.room_code}
                 </p>
               </div>
             </div>
