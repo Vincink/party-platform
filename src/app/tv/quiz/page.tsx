@@ -46,6 +46,35 @@ interface CardPalette {
   badgeText: string;
 }
 
+interface OptionColorStyle {
+  bg: string;
+  border: string;
+  letterBadgeBg: string;
+}
+
+const OPTION_STYLES: OptionColorStyle[] = [
+  {
+    bg: '#dc2626',
+    border: '#fca5a5',
+    letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
+  },
+  {
+    bg: '#eab308',
+    border: '#fde047',
+    letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
+  },
+  {
+    bg: '#2563eb',
+    border: '#93c5fd',
+    letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
+  },
+  {
+    bg: '#16a34a',
+    border: '#86efac',
+    letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
+  },
+];
+
 const CARD_PALETTES: CardPalette[] = [
   {
     bg: '#2563eb',
@@ -129,6 +158,8 @@ const BASE_QUESTIONS: QuizQuestion[] = [
   },
 ];
 
+const QUIZ_DURATION = 12;
+
 function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   if (!raw) return {};
   if (typeof raw === 'string') {
@@ -176,7 +207,7 @@ export default function TvQuizPage() {
   const [room, setRoom] = useState<RoomRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [questionIndex, setQuestionIndex] = useState<number>(0);
-  const [showAnswer, setShowAnswer] = useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = useState<number>(QUIZ_DURATION);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -243,7 +274,13 @@ export default function TvQuizPage() {
       setRoom(targetRoom);
       const cfg = parseConfig(targetRoom.config);
       if (typeof cfg.question_index === 'number' && cfg.question_index >= 0) {
-        setQuestionIndex(cfg.question_index % BASE_QUESTIONS.length);
+        const normalizedIdx = cfg.question_index % BASE_QUESTIONS.length;
+        setQuestionIndex((prev) => {
+          if (prev !== normalizedIdx) {
+            setTimeLeft(QUIZ_DURATION);
+          }
+          return normalizedIdx;
+        });
       }
 
       const { data: roomPlayers } = await supabase
@@ -307,10 +344,25 @@ export default function TvQuizPage() {
     };
   }, [roomCode, refreshQuizData]);
 
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+
+    const timerId = window.setInterval(() => {
+      setTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [questionIndex, timeLeft]);
+
   const syncQuestionIndex = async (nextIdx: number) => {
-    const normalized = ((nextIdx % BASE_QUESTIONS.length) + BASE_QUESTIONS.length) % BASE_QUESTIONS.length;
+    if (timeLeft > 0) return;
+
+    const normalized =
+      ((nextIdx % BASE_QUESTIONS.length) + BASE_QUESTIONS.length) % BASE_QUESTIONS.length;
     setQuestionIndex(normalized);
-    setShowAnswer(false);
+    setTimeLeft(QUIZ_DURATION);
 
     const activeCode = room?.room_code || roomCode;
     if (!activeCode) return;
@@ -320,6 +372,7 @@ export default function TvQuizPage() {
       ...currentCfg,
       game_mode: 'quiz',
       question_index: normalized,
+      time_left: QUIZ_DURATION,
     };
 
     await supabase
@@ -342,6 +395,7 @@ export default function TvQuizPage() {
 
   const activeRoomCode = room?.room_code || roomCode || 'SALON';
   const currentQuestion = BASE_QUESTIONS[questionIndex] || BASE_QUESTIONS[0];
+  const isTimeOver = timeLeft <= 0;
   const usedPaletteIndices = new Set<number>();
 
   return (
@@ -384,9 +438,14 @@ export default function TvQuizPage() {
           </span>
         </div>
 
-        <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
-          Question {questionIndex + 1} / {BASE_QUESTIONS.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-extrabold uppercase tracking-[0.14em] bg-white/[0.14] border border-white/25 text-white tabular-nums">
+            Chrono : {timeLeft}s
+          </span>
+          <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
+            Question {questionIndex + 1} / {BASE_QUESTIONS.length}
+          </span>
+        </div>
       </header>
 
       <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-stretch">
@@ -401,24 +460,38 @@ export default function TvQuizPage() {
             </h1>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center content-center flex-1 min-h-0">
             {currentQuestion.options.map((opt, idx) => {
-              const isCorrect = showAnswer && idx === currentQuestion.correctIndex;
+              const colorStyle = OPTION_STYLES[idx] || OPTION_STYLES[0];
+              const isCorrect = isTimeOver && idx === currentQuestion.correctIndex;
+              const isDimmed = isTimeOver && idx !== currentQuestion.correctIndex;
+
               return (
                 <div
                   key={opt}
-                  className={`rounded-[24px] border-2 px-5 py-4 flex items-center gap-4 transition ${
+                  style={{
+                    backgroundColor: colorStyle.bg,
+                    borderColor: isCorrect ? '#ffffff' : colorStyle.border,
+                    opacity: isDimmed ? 0.45 : 1,
+                  }}
+                  className={`h-20 sm:h-24 rounded-[22px] border-2 px-5 flex items-center justify-between gap-3 transition-all duration-300 ${
                     isCorrect
-                      ? 'bg-emerald-500/25 border-emerald-300 shadow-[0_12px_28px_-8px_rgba(16,185,129,0.55)]'
-                      : 'bg-white/[0.07] border-white/15'
+                      ? 'ring-4 ring-white shadow-[0_16px_36px_-6px_rgba(255,255,255,0.55)] scale-[1.02]'
+                      : 'shadow-md'
                   }`}
                 >
-                  <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-base font-bold text-white shrink-0">
+                  <span
+                    style={{ backgroundColor: colorStyle.letterBadgeBg }}
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-extrabold text-white shrink-0"
+                  >
                     {String.fromCharCode(65 + idx)}
                   </span>
-                  <span className="text-xl font-semibold text-white">
+
+                  <span className="flex-1 text-center text-2xl sm:text-3xl font-bold text-white truncate">
                     {opt}
                   </span>
+
+                  <span className="w-12 shrink-0" aria-hidden="true" />
                 </div>
               );
             })}
@@ -427,24 +500,18 @@ export default function TvQuizPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
             <button
               type="button"
+              disabled={timeLeft > 0}
               onClick={() => void syncQuestionIndex(questionIndex - 1)}
-              className="px-4 py-3 rounded-2xl bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-sm font-semibold text-white cursor-pointer transition"
+              className="px-4 py-3 rounded-2xl bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-sm font-semibold text-white cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Précédente
             </button>
 
             <button
               type="button"
-              onClick={() => setShowAnswer((prev) => !prev)}
-              className="px-5 py-3 rounded-2xl bg-amber-400 text-slate-950 text-sm font-bold cursor-pointer transition hover:brightness-105"
-            >
-              {showAnswer ? 'Masquer la réponse' : 'Afficher la réponse'}
-            </button>
-
-            <button
-              type="button"
+              disabled={timeLeft > 0}
               onClick={() => void syncQuestionIndex(questionIndex + 1)}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-sm font-bold cursor-pointer transition hover:brightness-105"
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-sm font-bold cursor-pointer transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Question suivante
             </button>
