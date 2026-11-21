@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export interface TvPlayerState {
+interface TvPlayerState {
   id: string;
   name: string;
   color?: string;
@@ -16,7 +16,7 @@ interface TvPlayersBarProps {
   showEarnedPoints?: boolean;
 }
 
-export function TvPlayersBar({
+function TvPlayersBar({
   players,
   showEarnedPoints = false,
 }: TvPlayersBarProps) {
