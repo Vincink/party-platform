@@ -111,48 +111,82 @@ export default function TvPage() {
   }, []);
 
   const refreshTvData = useCallback(async () => {
-    if (!roomCode) return;
+    let targetRoom: RoomRow | null = null;
 
-    const { data: roomData } = await supabase
-      .from('rooms')
-      .select('id, room_code, status, config')
-      .eq('room_code', roomCode)
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    if (roomCode) {
+      const { data: specificRoom } = await supabase
+        .from('rooms')
+        .select('id, room_code, status, config')
+        .eq('room_code', roomCode)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (roomData) {
-      setRoom(roomData as RoomRow);
+      if (specificRoom) {
+        targetRoom = specificRoom as RoomRow;
+      }
     }
 
-    const { data: playersData } = await supabase
-      .from('players')
-      .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
-      .eq('room_code', roomCode)
-      .order('id', { ascending: true });
+    if (!targetRoom) {
+      const { data: latestRoom } = await supabase
+        .from('rooms')
+        .select('id, room_code, status, config')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (Array.isArray(playersData)) {
-      setPlayers(playersData as PlayerRow[]);
+      if (latestRoom) {
+        targetRoom = latestRoom as RoomRow;
+        if (!roomCode && targetRoom.room_code) {
+          setRoomCode(targetRoom.room_code);
+        }
+      }
+    }
+
+    if (targetRoom) {
+      setRoom(targetRoom);
+
+      const { data: playersData } = await supabase
+        .from('players')
+        .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
+        .eq('room_code', targetRoom.room_code)
+        .order('id', { ascending: true });
+
+      if (Array.isArray(playersData)) {
+        setPlayers(playersData as PlayerRow[]);
+      }
+    } else {
+      const { data: fallbackPlayers } = await supabase
+        .from('players')
+        .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
+        .order('id', { ascending: true });
+
+      if (Array.isArray(fallbackPlayers)) {
+        setPlayers(fallbackPlayers as PlayerRow[]);
+      }
     }
   }, [roomCode]);
 
   useEffect(() => {
-    if (!roomCode) return;
-
     void refreshTvData();
 
+    const filter = roomCode ? `room_code=eq.${roomCode}` : undefined;
+
     const channel = supabase
-      .channel(`tv-sync-${roomCode}`)
+      .channel(`tv-sync-${roomCode || 'latest'}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${roomCode}` },
+        filter
+          ? { event: '*', schema: 'public', table: 'players', filter }
+          : { event: '*', schema: 'public', table: 'players' },
         () => {
           void refreshTvData();
         }
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
+        filter
+          ? { event: '*', schema: 'public', table: 'rooms', filter }
+          : { event: '*', schema: 'public', table: 'rooms' },
         () => {
           void refreshTvData();
         }
@@ -179,20 +213,21 @@ export default function TvPage() {
   }));
 
   const answeredCount = tvPlayers.filter((p) => p.hasAnswered).length;
+  const activeRoomLabel = room?.room_code || roomCode;
 
   return (
-    <main className="min-h-screen w-full bg-slate-950 text-white flex flex-col justify-between p-6">
+    <main className="min-h-screen w-full bg-slate-950 text-white flex flex-col justify-between px-6 py-5">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            Écran TV {roomCode ? `• Salon ${roomCode}` : ''}
+            Écran TV {activeRoomLabel ? `• Salon ${activeRoomLabel}` : ''}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-black">
+          <h1 className="text-2xl sm:text-3xl font-black truncate">
             {room?.status ? `État : ${room.status}` : 'En attente de la partie'}
           </h1>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 border border-white/10 px-4 py-2 text-sm font-bold text-emerald-300">
+        <div className="rounded-2xl bg-slate-900 border border-white/10 px-4 py-2 text-sm font-bold text-emerald-300 shrink-0">
           Réponses : {answeredCount} / {tvPlayers.length}
         </div>
       </header>
@@ -200,9 +235,7 @@ export default function TvPage() {
       <section className="my-auto py-6">
         {tvPlayers.length === 0 ? (
           <p className="text-center text-slate-400 text-lg">
-            {roomCode
-              ? `Aucun joueur connecté sur le salon ${roomCode}.`
-              : 'Ajoutez ?code=XXXXXX dans l’adresse pour afficher le salon.'}
+            Aucun joueur connecté pour le moment.
           </p>
         ) : (
           <TvPlayersBar players={tvPlayers} />
