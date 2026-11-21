@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { QUESTIONS, type QuizQuestion } from '@/data/questions'
 import { MUSIQUE_QUESTIONS } from '@/data/questions-musique'
@@ -172,6 +173,8 @@ function formatVerdictBadge(entry?: EvaluatedPetitBacEntry, hasRawAnswer = false
 }
 
 export default function TVPage() {
+  const router = useRouter()
+  const [entryModeSelected, setEntryModeSelected] = useState<boolean>(false)
   const [pin, setPin] = useState<string>('')
   const [joinUrl, setJoinUrl] = useState<string>('')
   const [selectedGame, setSelectedGame] = useState<GameType>('quiz')
@@ -935,6 +938,11 @@ export default function TVPage() {
     }
   }
 
+  function handleGoToPlayer() {
+    const targetPin = pin || pinRef.current
+    router.push(targetPin ? `/player?pin=${targetPin}` : '/player')
+  }
+
   const activeGameOption =
     GAME_OPTIONS.find((g) => g.id === selectedGame) || GAME_OPTIONS[0]
   const activeThemeOption =
@@ -979,11 +987,15 @@ export default function TVPage() {
           <div className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-sky-400" />
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">
-              Mode TV • Hôte
+              {!entryModeSelected ? 'Accueil' : 'Mode TV • Hôte'}
             </span>
           </div>
 
-          {!gameOpened ? (
+          {!entryModeSelected ? (
+            <span className="text-sm font-medium text-zinc-300">
+              Choisir un mode d&apos;accès
+            </span>
+          ) : !gameOpened ? (
             <div className="flex items-center gap-2.5">
               <span className="text-xs uppercase tracking-[0.12em] text-zinc-400 font-medium">
                 Code PIN
@@ -1017,7 +1029,68 @@ export default function TVPage() {
           </div>
         )}
 
-        {!gameOpened ? (
+        {!entryModeSelected ? (
+          <div className="max-w-3xl w-full mx-auto my-auto space-y-6">
+            <section className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-8 md:p-10 rounded-3xl space-y-8">
+              <div className="text-center space-y-2">
+                <p className="text-xs uppercase tracking-[0.14em] text-zinc-400 font-semibold">
+                  Configuration
+                </p>
+                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white">
+                  Comment souhaitez-vous démarrer ?
+                </h1>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setEntryModeSelected(true)}
+                  className="p-6 rounded-2xl bg-zinc-950/70 hover:bg-zinc-800/70 border border-white/10 hover:border-sky-400/60 text-left flex flex-col justify-between gap-6 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-[0.12em] font-semibold text-sky-300">
+                      Écran principal
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/5 border border-white/10 text-zinc-300">
+                      Hôte
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-2xl font-semibold tracking-tight text-white">
+                      Mode TV / Hôte
+                    </p>
+                    <p className="text-sm text-zinc-400">
+                      Créer un salon, afficher le code PIN et le QR code, animer la partie et suivre le classement.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGoToPlayer}
+                  className="p-6 rounded-2xl bg-zinc-950/70 hover:bg-zinc-800/70 border border-white/10 hover:border-white/30 text-left flex flex-col justify-between gap-6 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-[0.12em] font-semibold text-zinc-300">
+                      Manette mobile
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/5 border border-white/10 text-zinc-300">
+                      Joueur
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-2xl font-semibold tracking-tight text-white">
+                      Rejoindre
+                    </p>
+                    <p className="text-sm text-zinc-400">
+                      Ouvrir l&apos;écran joueur pour saisir un code PIN, choisir un pseudo et répondre aux manches.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : !gameOpened ? (
           <div className="max-w-4xl w-full mx-auto my-auto space-y-6">
             <section className="bg-zinc-900/75 backdrop-blur-xl border border-white/10 p-7 md:p-8 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="space-y-2 text-center md:text-left">
