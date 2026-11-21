@@ -29,15 +29,80 @@ interface PlayerRow {
   client_id: string | null;
 }
 
-const FALLBACK_COLORS = [
-  '#38bdf8',
-  '#34d399',
-  '#fbbf24',
-  '#f472b6',
-  '#a78bfa',
-  '#fb923c',
-  '#22d3ee',
-  '#4ade80',
+interface CardPalette {
+  bg: string;
+  border: string;
+  text: string;
+  subtext: string;
+  badgeBg: string;
+  badgeText: string;
+}
+
+const CARD_PALETTES: CardPalette[] = [
+  {
+    bg: '#2563eb',
+    border: '#93c5fd',
+    text: '#ffffff',
+    subtext: '#dbeafe',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#059669',
+    border: '#6ee7b7',
+    text: '#ffffff',
+    subtext: '#d1fae5',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#d97706',
+    border: '#fcd34d',
+    text: '#ffffff',
+    subtext: '#fef3c7',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#db2777',
+    border: '#f9a8d4',
+    text: '#ffffff',
+    subtext: '#fce7f3',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#7c3aed',
+    border: '#c4b5fd',
+    text: '#ffffff',
+    subtext: '#ede9fe',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#ea580c',
+    border: '#fdba74',
+    text: '#ffffff',
+    subtext: '#ffedd5',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#0891b2',
+    border: '#67e8f9',
+    text: '#ffffff',
+    subtext: '#cffafe',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#e11d48',
+    border: '#fda4af',
+    text: '#ffffff',
+    subtext: '#ffe4e6',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
 ];
 
 function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
@@ -52,18 +117,34 @@ function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   return raw;
 }
 
-function resolvePlayerColor(avatar: string | null, index: number): string {
-  const trimmed = (avatar || '').trim();
-  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed)) {
-    return trimmed;
+function getUniquePlayerPalette(player: PlayerRow, usedIndices: Set<number>): CardPalette {
+  const seed = `${player.id}-${player.client_id || ''}-${player.pseudo || ''}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
-  if (/^(rgb|rgba|hsl|hsla)\(/i.test(trimmed)) {
-    return trimmed;
+
+  let idx = hash % CARD_PALETTES.length;
+  let attempts = 0;
+  while (usedIndices.has(idx) && attempts < CARD_PALETTES.length) {
+    idx = (idx + 1) % CARD_PALETTES.length;
+    attempts++;
   }
-  if (/^[a-zA-Z]{3,20}$/.test(trimmed)) {
-    return trimmed.toLowerCase();
+
+  if (usedIndices.has(idx)) {
+    const hue = (hash * 137) % 360;
+    return {
+      bg: `hsl(${hue} 78% 46%)`,
+      border: `hsl(${hue} 90% 78%)`,
+      text: '#ffffff',
+      subtext: 'rgba(255,255,255,0.88)',
+      badgeBg: 'rgba(15, 23, 42, 0.35)',
+      badgeText: '#ffffff',
+    };
   }
-  return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+
+  usedIndices.add(idx);
+  return CARD_PALETTES[idx];
 }
 
 export default function TvPage() {
@@ -243,10 +324,13 @@ export default function TvPage() {
     joinUrl
   )}`;
 
+  const usedPaletteIndices = new Set<number>();
+
   return (
-    <main className="relative min-h-screen w-full bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-6 md:px-10 md:py-8">
+    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-5 md:px-10 md:py-6">
       <style>{`
         html, body {
+          overflow: hidden;
           overscroll-behavior: none;
           font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
         }
@@ -276,24 +360,19 @@ export default function TvPage() {
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
       />
 
-      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 max-w-7xl w-full mx-auto mb-6">
-        <div className="space-y-1">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
-            tvOS • Salon {activeRoomCode}
-          </span>
-          <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white">
-            Prépare ta partie
-          </h1>
-        </div>
+      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4 max-w-7xl w-full mx-auto mb-4 shrink-0">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
+          tvOS • Salon {activeRoomCode}
+        </span>
 
         <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
           {players.length} joueur{players.length > 1 ? 's' : ''} connecté{players.length > 1 ? 's' : ''}
         </span>
       </header>
 
-      <section className="relative z-10 max-w-7xl w-full mx-auto my-auto grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+      <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         {/* Colonne 1 : QR Code */}
-        <div className="tvos-card p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-center text-center gap-4">
+        <div className="tvos-card h-full p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-center text-center gap-4">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
             Connexion rapide
           </span>
@@ -327,8 +406,8 @@ export default function TvPage() {
         </div>
 
         {/* Colonne 2 : Choix du jeu (Quiz / Petit Bac) */}
-        <div className="p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-5">
-          <div className="text-center space-y-1">
+        <div className="h-full p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-5">
+          <div className="text-center space-y-1 shrink-0">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
               Modes de jeu
             </span>
@@ -337,11 +416,11 @@ export default function TvPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 flex-1">
+          <div className="grid grid-cols-1 gap-4 flex-1 min-h-0">
             <button
               type="button"
               onClick={() => void handleSelectGame('quiz')}
-              className={`tvos-card p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
+              className={`tvos-card h-full p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'quiz'
                   ? 'bg-sky-400/20 border-sky-300 shadow-[0_14px_32px_-10px_rgba(56,189,248,0.5)]'
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
@@ -385,7 +464,7 @@ export default function TvPage() {
             <button
               type="button"
               onClick={() => void handleSelectGame('petit-bac')}
-              className={`tvos-card p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
+              className={`tvos-card h-full p-5 rounded-[26px] border text-left flex items-center gap-4 cursor-pointer transition-colors ${
                 selectedGame === 'petit-bac'
                   ? 'bg-indigo-400/20 border-cyan-300 shadow-[0_14px_32px_-10px_rgba(99,102,241,0.5)]'
                   : 'bg-white/[0.07] border-white/15 hover:border-white/35'
@@ -434,8 +513,8 @@ export default function TvPage() {
         </div>
 
         {/* Colonne 3 : Joueurs connectés */}
-        <div className="p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
-          <div className="flex items-center justify-between gap-2">
+        <div className="h-full min-h-0 p-6 md:p-7 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
+          <div className="flex items-center justify-between gap-2 shrink-0">
             <div>
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
                 Salon
@@ -456,35 +535,39 @@ export default function TvPage() {
               </p>
             </div>
           ) : (
-            <ul className="space-y-2.5 flex-1 overflow-y-auto pr-1">
-              {players.map((p, index) => {
+            <ul className="space-y-2.5 flex-1 min-h-0 overflow-y-auto pr-1">
+              {players.map((p) => {
                 const name = p.pseudo?.trim() || 'Joueur';
-                const dotColor = resolvePlayerColor(p.avatar, index);
+                const palette = getUniquePlayerPalette(p, usedPaletteIndices);
                 const score = typeof p.score === 'number' ? p.score : 0;
                 const answered = Boolean(p.answer && p.answer.trim().length > 0);
 
                 return (
                   <li
                     key={p.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950/55 border border-white/15 px-3.5 py-2.5"
+                    style={{
+                      backgroundColor: palette.bg,
+                      borderColor: palette.border,
+                      color: palette.text,
+                    }}
+                    className="flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 shadow-md"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className="h-4 w-4 rounded-full shrink-0 ring-2 ring-white/50"
-                        style={{ backgroundColor: dotColor }}
-                        aria-hidden="true"
-                      />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-white truncate">
-                          {name}
-                        </p>
-                        <p className="text-[11px] text-slate-300">
-                          {answered ? 'Réponse envoyée' : 'Connecté'}
-                        </p>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate" style={{ color: palette.text }}>
+                        {name}
+                      </p>
+                      <p className="text-[11px] font-medium" style={{ color: palette.subtext }}>
+                        {answered ? 'Réponse envoyée' : 'Connecté'}
+                      </p>
                     </div>
 
-                    <span className="rounded-xl bg-white/15 px-2.5 py-1 text-xs font-semibold text-white shrink-0">
+                    <span
+                      style={{
+                        backgroundColor: palette.badgeBg,
+                        color: palette.badgeText,
+                      }}
+                      className="rounded-xl px-2.5 py-1 text-xs font-semibold shrink-0"
+                    >
                       {score} pts
                     </span>
                   </li>
@@ -495,7 +578,7 @@ export default function TvPage() {
         </div>
       </section>
 
-      <footer className="relative z-10 max-w-7xl w-full mx-auto text-center mt-6">
+      <footer className="relative z-10 max-w-7xl w-full mx-auto text-center mt-4 shrink-0">
         <p className="text-xs tracking-wide text-slate-400">
           Synchronisation temps réel • Salon multijoueur
         </p>
