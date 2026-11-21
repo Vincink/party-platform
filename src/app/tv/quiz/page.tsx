@@ -462,7 +462,7 @@ export default function TvQuizPage() {
       </header>
 
       <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-stretch">
-        {/* Zone principale : Chrono en haut à droite + Question centrée un peu plus bas + Cases réponse remontées */}
+        {/* Zone principale : Chrono en haut à droite + Question plus grande et plus basse + Cases réponse remontées */}
         <div className="relative h-full min-h-0 p-6 md:p-8 rounded-[32px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between gap-4">
           <div className="flex items-start justify-end shrink-0">
             <span
@@ -476,16 +476,16 @@ export default function TvQuizPage() {
             </span>
           </div>
 
-          <div className="mt-2 mb-2 px-4 sm:px-10 text-center flex flex-col items-center justify-center gap-2 shrink-0">
+          <div className="mt-6 mb-3 px-4 sm:px-10 text-center flex flex-col items-center justify-center gap-2 shrink-0">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
               {currentQuestion.category}
             </span>
-            <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-white leading-tight max-w-3xl">
+            <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white leading-tight max-w-4xl">
               {currentQuestion.question}
             </h1>
           </div>
 
-          <div className="mt-auto mb-3 flex flex-col gap-5">
+          <div className="mt-auto mb-6 flex flex-col gap-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {currentQuestion.options.map((opt, idx) => {
                 const colorStyle = OPTION_STYLES[idx] || OPTION_STYLES[0];
@@ -523,7 +523,7 @@ export default function TvQuizPage() {
               })}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pt-2">
               <button
                 type="button"
                 disabled={timeLeft > 0}
