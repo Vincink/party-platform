@@ -25,7 +25,6 @@ interface Player {
   score: number
   is_connected?: boolean | null
   client_id?: string | null
-  answer?: string | null
 }
 
 function getOrCreateClientId(): string {
@@ -101,7 +100,7 @@ function PlayerContent() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `id=eq.${player.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${player.id}` },
         (payload) => {
           if (payload.new) {
             setPlayer(payload.new as Player)
@@ -136,7 +135,7 @@ function PlayerContent() {
     const { data: foundRoom, error: roomError } = await supabase
       .from('rooms')
       .select('*')
-      .ilike('room_code', cleanCode)
+      .eq('room_code', cleanCode)
       .order('id', { ascending: false })
       .limit(1)
       .single()
