@@ -114,6 +114,7 @@ function PlayerContent() {
   const lockedAnswerRef = useRef<ChoiceKey | null>(null)
   const submittingAnswerRef = useRef<boolean>(false)
   const lastRoomStatusRef = useRef<string>('')
+  const bacInputRef = useRef<HTMLInputElement | null>(null)
   const scoreRef = useRef<number>(0)
   const lastTapRef = useRef<number>(0)
 
@@ -264,15 +265,20 @@ function PlayerContent() {
 
       const parsedBac = parseBacStatus(nextStatus)
       if (parsedBac) {
+        setGameType('petitbac')
         setBacPrompt(parsedBac)
         if (prevStatus !== nextStatus) {
           resetRoundInputs()
+          window.setTimeout(() => {
+            bacInputRef.current?.focus()
+          }, 50)
         }
         lastRoomStatusRef.current = nextStatus
         return
       }
 
       if (nextStatus.startsWith('playing')) {
+        setGameType('quiz')
         if (prevStatus !== nextStatus) {
           resetRoundInputs()
         }
@@ -445,6 +451,7 @@ function PlayerContent() {
       .maybeSingle()
 
     const initialStatus = room.status || 'waiting'
+    const parsedInitialBac = parseBacStatus(initialStatus)
 
     if (existingPlayer) {
       const { error: updErr } = await supabase
@@ -474,8 +481,8 @@ function PlayerContent() {
       setScore(existingPlayer.score ?? 0)
       setSelectedAnswer(restoredAnswer)
       setRoomStatus(initialStatus)
-      setBacPrompt(parseBacStatus(initialStatus))
-      if (room.game_type === 'petitbac') {
+      setBacPrompt(parsedInitialBac)
+      if (parsedInitialBac || room.game_type === 'petitbac') {
         setGameType('petitbac')
       } else if (room.game_type === 'quiz') {
         setGameType('quiz')
@@ -513,8 +520,8 @@ function PlayerContent() {
     setScore(inserted.score ?? 0)
     setSelectedAnswer(null)
     setRoomStatus(initialStatus)
-    setBacPrompt(parseBacStatus(initialStatus))
-    if (room.game_type === 'petitbac') {
+    setBacPrompt(parsedInitialBac)
+    if (parsedInitialBac || room.game_type === 'petitbac') {
       setGameType('petitbac')
     } else if (room.game_type === 'quiz') {
       setGameType('quiz')
@@ -566,11 +573,15 @@ function PlayerContent() {
 
   const isRevealed = roomStatus.startsWith('revealed:') || Boolean(lastOutcome)
   const isLocked = Boolean(selectedAnswer) || isRevealed || roomStatus === 'finished'
-  const isBacRoundOpen =
-    gameType === 'petitbac' &&
-    roomStatus.startsWith('bac_playing:') &&
-    Boolean(bacPrompt)
+  const isBacMode = gameType === 'petitbac' || roomStatus.startsWith('bac_')
+  const isBacRoundOpen = roomStatus.startsWith('bac_playing:') && Boolean(bacPrompt)
   const theme = getPlayerColorTheme(playerId ?? 0)
+
+  const editableInputStyle: React.CSSProperties = {
+    touchAction: 'manipulation',
+    userSelect: 'text',
+    WebkitUserSelect: 'text',
+  }
 
   return (
     <main
@@ -607,8 +618,8 @@ function PlayerContent() {
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="1234"
-              style={{ touchAction: 'manipulation' }}
-              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-center text-3xl font-black tracking-widest"
+              style={editableInputStyle}
+              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-center text-3xl font-black tracking-widest select-text"
             />
           </div>
 
@@ -622,8 +633,8 @@ function PlayerContent() {
               value={pseudo}
               onChange={(e) => setPseudo(e.target.value)}
               placeholder="Ex : Thomas"
-              style={{ touchAction: 'manipulation' }}
-              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold"
+              style={editableInputStyle}
+              className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold select-text"
             />
           </div>
 
@@ -665,7 +676,7 @@ function PlayerContent() {
             </div>
           </div>
 
-          {gameType === 'quiz' ? (
+          {!isBacMode ? (
             <div className="grid grid-cols-2 gap-3">
               {CHOICES.map((item) => {
                 const isSelected = selectedAnswer === item.key
@@ -714,13 +725,22 @@ function PlayerContent() {
                   </div>
 
                   <input
+                    ref={bacInputRef}
                     type="text"
+                    enterKeyHint="send"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="words"
+                    spellCheck={false}
                     maxLength={50}
                     value={bacWordInput}
+                    onTouchStart={(e) => {
+                      e.currentTarget.focus()
+                    }}
                     onChange={(e) => setBacWordInput(e.target.value)}
                     placeholder={`Mot commençant par ${bacPrompt.letter}...`}
-                    style={{ touchAction: 'manipulation' }}
-                    className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold"
+                    style={editableInputStyle}
+                    className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border-2 border-slate-700 focus:border-indigo-400 outline-none text-xl font-bold select-text"
                   />
 
                   <button
@@ -762,27 +782,27 @@ function PlayerContent() {
                 Partie terminée — regarde le podium sur la TV !
               </p>
             )}
-            {gameType === 'quiz' && isRevealed && lastOutcome === 'correct' && (
+            {!isBacMode && isRevealed && lastOutcome === 'correct' && (
               <p className="text-base font-black text-emerald-400">
                 Bonne réponse (+10 pts)
               </p>
             )}
-            {gameType === 'quiz' && isRevealed && lastOutcome === 'wrong' && (
+            {!isBacMode && isRevealed && lastOutcome === 'wrong' && (
               <p className="text-base font-black text-rose-400">
                 Mauvaise réponse (-5 pts)
               </p>
             )}
-            {gameType === 'quiz' && isRevealed && !lastOutcome && (
+            {!isBacMode && isRevealed && !lastOutcome && (
               <p className="text-sm font-bold text-slate-400">
                 Réponse révélée sur la TV
               </p>
             )}
-            {gameType === 'quiz' && !isRevealed && roomStatus !== 'finished' && selectedAnswer && (
+            {!isBacMode && !isRevealed && roomStatus !== 'finished' && selectedAnswer && (
               <p className="text-sm font-bold text-indigo-300">
                 Réponse {selectedAnswer} envoyée à la TV
               </p>
             )}
-            {gameType === 'quiz' &&
+            {!isBacMode &&
               !isRevealed &&
               roomStatus !== 'waiting' &&
               roomStatus !== 'finished' &&
@@ -791,7 +811,7 @@ function PlayerContent() {
                   Choisis A, B, C ou D avant la fin du chrono
                 </p>
               )}
-            {gameType === 'petitbac' && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
+            {isBacMode && roomStatus !== 'waiting' && roomStatus !== 'finished' && (
               <p className="text-sm font-bold text-indigo-300">
                 {bacSubmittedWord
                   ? `Mot enregistré : ${bacSubmittedWord}`
