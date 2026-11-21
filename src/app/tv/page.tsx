@@ -208,6 +208,7 @@ export default function TVPage() {
   const bacRoundsRef = useRef<PetitBacRound[]>(bacRounds)
   const bacRoundIndexRef = useRef<number>(0)
   const isBacRevealingRef = useRef<boolean>(false)
+  const countdownLaunchedRef = useRef<boolean>(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
@@ -468,49 +469,54 @@ export default function TVPage() {
     }
   }, [])
 
+  // Décompte 3, 2, 1 sans effet de bord dans setState
   useEffect(() => {
     if (!gameRunning || startCountdown === null || gameFinished) return
 
-    const countdownTimer = window.setInterval(() => {
-      setStartCountdown((prev) => {
-        if (prev === null) return null
-        if (prev <= 1) {
-          window.clearInterval(countdownTimer)
-          const currentPin = pinRef.current
-          const activeGame = selectedGameRef.current
+    if (startCountdown <= 0) {
+      if (countdownLaunchedRef.current) return
+      countdownLaunchedRef.current = true
 
-          if (activeGame === 'quiz') {
-            if (currentPin) {
-              void supabase
-                .from('rooms')
-                .update({ status: 'playing:0', game_type: 'quiz' })
-                .eq('room_code', currentPin)
-            }
-            setTimeLeft(QUESTION_DURATION)
-          } else {
-            const firstRound = bacRoundsRef.current[0]
-            if (currentPin && firstRound) {
-              void supabase
-                .from('rooms')
-                .update({
-                  status: `bac_playing:0:${firstRound.letter}:${encodeURIComponent(firstRound.category)}`,
-                  game_type: 'petitbac',
-                })
-                .eq('room_code', currentPin)
-            }
-            setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
-            setBacPhase('playing')
+      const currentPin = pinRef.current
+      const activeGame = selectedGameRef.current
+
+      async function launchRoundOne() {
+        if (activeGame === 'quiz') {
+          setTimeLeft(QUESTION_DURATION)
+          if (currentPin) {
+            await supabase
+              .from('rooms')
+              .update({ status: 'playing:0', game_type: 'quiz' })
+              .eq('room_code', currentPin)
           }
-
-          startTimerSound()
-          return null
+        } else {
+          const firstRound = bacRoundsRef.current[0]
+          setBacTimeLeft(PETIT_BAC_DURATION_SECONDS)
+          setBacPhase('playing')
+          if (currentPin && firstRound) {
+            await supabase
+              .from('rooms')
+              .update({
+                status: `bac_playing:0:${firstRound.letter}:${encodeURIComponent(firstRound.category)}`,
+                game_type: 'petitbac',
+              })
+              .eq('room_code', currentPin)
+          }
         }
-        return prev - 1
-      })
+        setStartCountdown(null)
+        startTimerSound()
+      }
+
+      void launchRoundOne()
+      return
+    }
+
+    const countdownTimer = window.setTimeout(() => {
+      setStartCountdown((prev) => (prev === null ? null : prev - 1))
     }, 1000)
 
     return () => {
-      window.clearInterval(countdownTimer)
+      window.clearTimeout(countdownTimer)
     }
   }, [gameRunning, startCountdown, gameFinished, startTimerSound])
 
@@ -613,6 +619,7 @@ export default function TVPage() {
       setBacEvaluations({})
     }
 
+    countdownLaunchedRef.current = false
     setGameOpened(true)
     setGameRunning(false)
     setStartCountdown(null)
@@ -623,6 +630,7 @@ export default function TVPage() {
     stopTimerSound()
     const currentPin = pin || pinRef.current
 
+    countdownLaunchedRef.current = false
     setStartCountdown(null)
     setGameRunning(false)
     setGameFinished(false)
@@ -675,10 +683,6 @@ export default function TVPage() {
       setBacEvaluations({})
     }
 
-    setGameFinished(false)
-    setGameRunning(true)
-    setStartCountdown(START_COUNTDOWN_SECONDS)
-
     if (currentPin) {
       await supabase
         .from('players')
@@ -690,10 +694,16 @@ export default function TVPage() {
         .eq('room_code', currentPin)
       setPlayersList((prev) => prev.map((p) => ({ ...p, answer: null })))
     }
+
+    countdownLaunchedRef.current = false
+    setGameFinished(false)
+    setGameRunning(true)
+    setStartCountdown(START_COUNTDOWN_SECONDS)
   }
 
   async function stopGame() {
     stopTimerSound()
+    countdownLaunchedRef.current = false
     setStartCountdown(null)
     setGameRunning(false)
     setRevealAnswers(false)
@@ -816,6 +826,7 @@ export default function TVPage() {
 
   async function finishGame() {
     stopTimerSound()
+    countdownLaunchedRef.current = false
     setStartCountdown(null)
     setGameRunning(false)
     const currentPin = pin || pinRef.current
@@ -850,6 +861,7 @@ export default function TVPage() {
     bacRoundsRef.current = rounds
     setBacRounds(rounds)
 
+    countdownLaunchedRef.current = false
     setPlayersList((prev) => prev.map((p) => ({ ...p, score: 0, answer: null })))
     setGameFinished(false)
     setGameOpened(false)
@@ -1069,7 +1081,7 @@ export default function TVPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 relative">
-            {startCountdown !== null && (
+            {startCountdown !== null && startCountdown > 0 && (
               <div className="fixed inset-0 z-50 bg-slate-950/90 flex flex-col items-center justify-center pointer-events-none select-none">
                 <span
                   key={`countdown-${startCountdown}`}
