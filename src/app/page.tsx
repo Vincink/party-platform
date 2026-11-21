@@ -6,7 +6,7 @@ export default function HomePage() {
   const router = useRouter()
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-8 md:px-14 md:py-12">
+    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-7 md:px-12 md:py-10">
       <style>{`
         html, body {
           overflow: hidden;
@@ -22,10 +22,10 @@ export default function HomePage() {
         }
         .tvos-card:hover,
         .tvos-card:focus-visible {
-          transform: scale(1.045) translateY(-4px);
+          transform: scale(1.025) translateY(-3px);
           box-shadow:
             0 28px 65px -12px rgba(2, 6, 23, 0.75),
-            0 0 0 2px rgba(255, 255, 255, 0.7);
+            0 0 0 2px rgba(255, 255, 255, 0.75);
           outline: none;
         }
       `}</style>
@@ -39,46 +39,65 @@ export default function HomePage() {
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
       />
 
-      <header className="relative z-10 flex items-center justify-between max-w-6xl w-full mx-auto">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
-          tvOS • Salon
+      <header className="relative z-10 flex items-center justify-between max-w-5xl w-full mx-auto">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+          tvOS • Party Platform
         </span>
-        <span className="inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.11] border border-white/25 text-sky-100 backdrop-blur-xl">
-          Plateforme multijoueur en temps réel
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
+          Multijoueur
         </span>
       </header>
 
-      <section className="relative z-10 max-w-5xl w-full mx-auto my-auto space-y-10">
-        <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight text-white leading-[1.04]">
-            Party Platform
+      <section className="relative z-10 max-w-5xl w-full mx-auto my-auto space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-white">
+            Choisis ton écran
           </h1>
-          <p className="text-base sm:text-lg md:text-xl text-slate-200 font-normal leading-relaxed">
-            Affichage dynamique sur grand écran et contrôles fluides sur smartphone.
+          <p className="text-sm sm:text-base text-slate-300">
+            Lance un salon sur la TV ou rejoins une partie depuis ton téléphone
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <button
             type="button"
             onClick={() => router.push('/tv')}
-            className="tvos-card group relative min-h-[220px] md:min-h-[250px] p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
+            className="tvos-card p-8 md:p-10 rounded-[32px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 text-left flex flex-col justify-between gap-8 cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-3 w-full">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
-                Grand écran
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/15 border border-white/20 text-slate-100">
-                Hôte
-              </span>
+            <div className="w-16 h-16 rounded-[22px] bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_12px_30px_-6px_rgba(56,189,248,0.65)] ring-2 ring-white/75 flex items-center justify-center">
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                className="w-9 h-9 text-white"
+                aria-hidden="true"
+              >
+                <rect
+                  x="6"
+                  y="10"
+                  width="36"
+                  height="24"
+                  rx="4"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                />
+                <path
+                  d="M16 40H32M24 34V40"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
+              </svg>
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">
-                Mode TV / Hôte
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+                Écran principal
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                Mode TV (Hôte)
               </h2>
-              <p className="text-sm md:text-base text-slate-200 leading-relaxed">
-                Lance le salon et affiche le code QR sur grand écran.
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Crée un salon, affiche le QR code et dirige les manches de Quiz ou de Petit Bac.
               </p>
             </div>
           </button>
@@ -86,32 +105,46 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => router.push('/player')}
-            className="tvos-card group relative min-h-[220px] md:min-h-[250px] p-7 md:p-9 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
+            className="tvos-card p-8 md:p-10 rounded-[32px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 text-left flex flex-col justify-between gap-8 cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-3 w-full">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
-                Smartphone
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/15 border border-white/20 text-slate-100">
-                Joueur
-              </span>
+            <div className="w-16 h-16 rounded-[22px] bg-gradient-to-br from-indigo-400 to-cyan-500 shadow-[0_12px_30px_-6px_rgba(99,102,241,0.65)] ring-2 ring-white/75 flex items-center justify-center">
+              <svg
+                viewBox="0 0 48 48"
+                fill="none"
+                className="w-9 h-9 text-white"
+                aria-hidden="true"
+              >
+                <rect
+                  x="14"
+                  y="6"
+                  width="20"
+                  height="36"
+                  rx="4.5"
+                  stroke="currentColor"
+                  strokeWidth="2.8"
+                />
+                <circle cx="24" cy="36" r="1.8" fill="currentColor" />
+              </svg>
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">
-                Rejoindre
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+                Manette mobile
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                Mode Joueur
               </h2>
-              <p className="text-sm md:text-base text-slate-200 leading-relaxed">
-                Entre le code de la partie depuis ton smartphone.
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Entre le code affiché sur la télévision et participe depuis ton smartphone.
               </p>
             </div>
           </button>
         </div>
       </section>
 
-      <footer className="relative z-10 max-w-6xl w-full mx-auto text-center">
+      <footer className="relative z-10 max-w-5xl w-full mx-auto text-center">
         <p className="text-xs tracking-wide text-slate-400">
-          Sélectionnez une tuile pour continuer
+          Synchronisation temps réel • Salon multijoueur
         </p>
       </footer>
     </main>
