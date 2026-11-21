@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type GameMode = 'quiz' | 'petit-bac';
@@ -148,6 +149,7 @@ function getUniquePlayerPalette(player: PlayerRow, usedIndices: Set<number>): Ca
 }
 
 export default function TvPage() {
+  const router = useRouter();
   const [roomCode, setRoomCode] = useState<string>('');
   const [room, setRoom] = useState<RoomRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
@@ -314,30 +316,37 @@ export default function TvPage() {
 
   const handleStartGame = async () => {
     const activeCode = room?.room_code || roomCode;
-    if (!activeCode || isLaunching) return;
+    if (isLaunching) return;
 
     setIsLaunching(true);
     try {
-      const currentCfg = parseConfig(room?.config);
-      const nextCfg: RoomConfig = {
-        ...currentCfg,
-        game_mode: selectedGame,
-        question_index: 0,
-      };
+      if (activeCode) {
+        const currentCfg = parseConfig(room?.config);
+        const nextCfg: RoomConfig = {
+          ...currentCfg,
+          game_mode: selectedGame,
+          question_index: 0,
+        };
 
-      const { data } = await supabase
-        .from('rooms')
-        .update({ status: 'playing', config: nextCfg })
-        .eq('room_code', activeCode)
-        .select('id, room_code, status, config')
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        const { data } = await supabase
+          .from('rooms')
+          .update({ status: 'playing', config: nextCfg })
+          .eq('room_code', activeCode)
+          .select('id, room_code, status, config')
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (data) {
-        setRoom(data as RoomRow);
-      } else {
-        setRoom((prev) => (prev ? { ...prev, status: 'playing', config: nextCfg } : prev));
+        if (data) {
+          setRoom(data as RoomRow);
+        } else {
+          setRoom((prev) => (prev ? { ...prev, status: 'playing', config: nextCfg } : prev));
+        }
+      }
+
+      if (selectedGame === 'quiz') {
+        const query = activeCode ? `?code=${encodeURIComponent(activeCode)}` : '';
+        router.push(`/tv/quiz${query}`);
       }
     } finally {
       setIsLaunching(false);
