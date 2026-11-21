@@ -33,6 +33,121 @@ function generateRoomCode(): string {
   return code
 }
 
+function QuizGameIcon({ selected }: { selected: boolean }) {
+  return (
+    <div
+      className={`w-16 h-16 md:w-20 md:h-20 rounded-[22px] flex items-center justify-center transition-all duration-300 ${
+        selected
+          ? 'bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_12px_30px_-6px_rgba(56,189,248,0.65)] ring-2 ring-white/80'
+          : 'bg-gradient-to-br from-sky-500/30 to-blue-700/30 border border-white/20'
+      }`}
+    >
+      <svg
+        viewBox="0 0 48 48"
+        fill="none"
+        className="w-9 h-9 md:w-11 md:h-11 text-white"
+        aria-hidden="true"
+      >
+        <path
+          d="M24 6C14.059 6 6 13.387 6 22.5c0 4.623 2.075 8.803 5.424 11.797-.36 3.105-1.693 5.792-1.742 5.888a1.25 1.25 0 0 0 1.448 1.766c3.828-1.01 7.032-2.797 8.88-3.981 1.29.277 2.624.43 3.99.43 9.941 0 18-7.387 18-16.4S33.941 6 24 6Z"
+          stroke="currentColor"
+          strokeWidth="2.6"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M19.8 18.2a4.3 4.3 0 0 1 8.35 1.45c0 2.75-4.15 3.65-4.15 6.1"
+          stroke="currentColor"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+        />
+        <circle cx="24" cy="30.8" r="1.75" fill="currentColor" />
+      </svg>
+    </div>
+  )
+}
+
+function PetitBacGameIcon({ selected }: { selected: boolean }) {
+  return (
+    <div
+      className={`w-16 h-16 md:w-20 md:h-20 rounded-[22px] flex items-center justify-center transition-all duration-300 ${
+        selected
+          ? 'bg-gradient-to-br from-indigo-400 to-cyan-500 shadow-[0_12px_30px_-6px_rgba(99,102,241,0.65)] ring-2 ring-white/80'
+          : 'bg-gradient-to-br from-indigo-500/30 to-cyan-600/30 border border-white/20'
+      }`}
+    >
+      <svg
+        viewBox="0 0 48 48"
+        fill="none"
+        className="w-9 h-9 md:w-11 md:h-11 text-white"
+        aria-hidden="true"
+      >
+        <rect
+          x="7"
+          y="7"
+          width="15"
+          height="15"
+          rx="4"
+          stroke="currentColor"
+          strokeWidth="2.6"
+        />
+        <path
+          d="M11.8 18L14.5 11L17.2 18M12.5 16.2H16.5"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <rect
+          x="26"
+          y="7"
+          width="15"
+          height="15"
+          rx="4"
+          stroke="currentColor"
+          strokeWidth="2.6"
+        />
+        <path
+          d="M31 11.2H34.2a2.1 2.1 0 0 1 0 4.2H31V11.2ZM31 15.4H34.6a2.2 2.2 0 0 1 0 4.4H31V15.4Z"
+          stroke="currentColor"
+          strokeWidth="2.1"
+          strokeLinejoin="round"
+        />
+        <rect
+          x="7"
+          y="26"
+          width="15"
+          height="15"
+          rx="4"
+          stroke="currentColor"
+          strokeWidth="2.6"
+        />
+        <path
+          d="M17.3 31.3a3.6 3.6 0 1 0 0 4.4"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+        <rect
+          x="26"
+          y="26"
+          width="15"
+          height="15"
+          rx="4"
+          stroke="currentColor"
+          strokeWidth="2.6"
+        />
+        <path
+          d="M30 33.5L32.4 36L37.5 30.8"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  )
+}
+
 export default function TvPage() {
   const router = useRouter()
   const [room, setRoom] = useState<Room | null>(null)
@@ -152,13 +267,13 @@ export default function TvPage() {
       : ''
 
   const qrCodeSrc = joinUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(joinUrl)}`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(joinUrl)}`
     : ''
 
   const activeGameType = room?.game_type || selectedMode
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-7 md:px-14 md:py-10">
+    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-6 py-5 md:px-10 md:py-7">
       <style>{`
         html, body {
           overflow: hidden;
@@ -174,10 +289,25 @@ export default function TvPage() {
         }
         .tvos-card:hover,
         .tvos-card:focus-visible {
-          transform: scale(1.03) translateY(-3px);
+          transform: scale(1.015) translateY(-2px);
           box-shadow:
             0 28px 65px -12px rgba(2, 6, 23, 0.75),
-            0 0 0 2px rgba(255, 255, 255, 0.7);
+            0 0 0 2px rgba(255, 255, 255, 0.65);
+          outline: none;
+        }
+        .tvos-tile {
+          transition:
+            transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+            border-color 220ms ease,
+            background 220ms ease;
+        }
+        .tvos-tile:hover,
+        .tvos-tile:focus-visible {
+          transform: scale(1.035) translateY(-3px);
+          box-shadow:
+            0 22px 45px -10px rgba(2, 6, 23, 0.7),
+            0 0 0 2px rgba(255, 255, 255, 0.8);
           outline: none;
         }
         .tvos-btn {
@@ -188,7 +318,7 @@ export default function TvPage() {
         }
         .tvos-btn:hover,
         .tvos-btn:focus-visible {
-          transform: scale(1.03);
+          transform: scale(1.025);
           box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
           outline: none;
         }
@@ -203,7 +333,7 @@ export default function TvPage() {
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
       />
 
-      <header className="relative z-10 flex items-center justify-between max-w-6xl w-full mx-auto gap-4">
+      <header className="relative z-10 flex items-center justify-between max-w-7xl w-full mx-auto gap-4 shrink-0">
         <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">
           tvOS • Mode Hôte
         </span>
@@ -224,9 +354,9 @@ export default function TvPage() {
         </div>
       </header>
 
-      <section className="relative z-10 max-w-6xl w-full mx-auto my-auto">
+      <section className="relative z-10 max-w-7xl w-full mx-auto flex-1 min-h-0 my-4 flex items-stretch">
         {loading ? (
-          <div className="text-center py-16 space-y-3">
+          <div className="w-full flex flex-col items-center justify-center text-center space-y-3">
             <p className="text-2xl font-semibold tracking-tight text-white">
               Creation du salon...
             </p>
@@ -235,7 +365,7 @@ export default function TvPage() {
             </p>
           </div>
         ) : errorMsg ? (
-          <div className="max-w-xl mx-auto p-8 rounded-[28px] bg-white/[0.12] border border-white/25 backdrop-blur-2xl text-center space-y-5">
+          <div className="max-w-xl m-auto p-8 rounded-[28px] bg-white/[0.12] border border-white/25 backdrop-blur-2xl text-center space-y-5">
             <h1 className="text-2xl font-semibold text-white">Erreur de salon</h1>
             <p className="text-sm text-slate-200">{errorMsg}</p>
             <button
@@ -247,7 +377,7 @@ export default function TvPage() {
             </button>
           </div>
         ) : room?.status === 'playing' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-stretch">
+          <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
             <div className="tvos-card lg:col-span-2 p-7 md:p-10 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-6">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
@@ -316,125 +446,167 @@ export default function TvPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-stretch">
-            <div className="tvos-card p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-between text-center space-y-4">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
-                Connexion rapide
-              </span>
+          <div className="w-full h-full grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-stretch">
+            {/* COLONNE GAUCHE : QR CODE SUR TOUTE LA HAUTEUR */}
+            <div className="lg:col-span-4 h-full p-6 md:p-8 rounded-[30px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-between text-center">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+                  Rejoindre la partie
+                </span>
+                <p className="text-xs text-slate-300">
+                  Scanne avec ton smartphone
+                </p>
+              </div>
 
               {qrCodeSrc && (
-                <div className="p-3 rounded-2xl bg-white">
+                <div className="p-4 md:p-5 rounded-[26px] bg-white shadow-[0_24px_55px_-12px_rgba(2,6,23,0.75)] my-auto">
                   <img
                     src={qrCodeSrc}
                     alt={`QR Code salon ${room?.room_code}`}
-                    className="w-40 h-40 md:w-44 md:h-44 object-contain"
+                    className="w-44 h-44 sm:w-52 sm:h-52 xl:w-60 xl:h-60 object-contain"
                   />
                 </div>
               )}
 
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
-                  Code du salon
+              <div className="w-full pt-3 border-t border-white/15 space-y-1.5">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">
+                  Ou entre le code sur <span className="text-white font-semibold">/player</span>
                 </p>
-                <p className="text-3xl md:text-4xl font-semibold tracking-[0.2em] text-white">
+                <p className="text-3xl md:text-4xl font-semibold tracking-[0.22em] text-white">
                   {room?.room_code}
                 </p>
               </div>
             </div>
 
-            <div className="tvos-card p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-5">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
-                    Joueurs
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/15 border border-white/20 text-slate-100">
-                    {players.length} pret{players.length > 1 ? 's' : ''}
-                  </span>
-                </div>
-
-                <p className="text-sm text-slate-200">
-                  Scanne le QR code ou saisis le code sur <span className="font-semibold text-white">/player</span>.
+            {/* COLONNE CENTRALE : ICÔNES DES JEUX + LANCEMENT */}
+            <div className="lg:col-span-4 h-full p-6 md:p-8 rounded-[30px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between">
+              <div className="text-center space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
+                  Choisir un jeu
+                </span>
+                <p className="text-xs text-slate-300">
+                  Sélectionne le mode de la manche
                 </p>
+              </div>
 
-                {players.length === 0 ? (
-                  <div className="py-6 px-4 rounded-2xl bg-white/[0.06] border border-white/15 text-center">
-                    <p className="text-sm text-slate-300">
-                      En attente des joueurs...
+              <div className="grid grid-cols-2 gap-4 my-auto py-4">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMode('quiz')}
+                  className={`tvos-tile p-5 rounded-[26px] flex flex-col items-center justify-center text-center gap-3.5 border cursor-pointer ${
+                    selectedMode === 'quiz'
+                      ? 'bg-white/[0.22] border-sky-300 shadow-[0_18px_40px_-10px_rgba(14,165,233,0.45)]'
+                      : 'bg-white/[0.07] border-white/15 text-slate-200'
+                  }`}
+                >
+                  <QuizGameIcon selected={selectedMode === 'quiz'} />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-lg tracking-tight text-white">
+                      Quiz
+                    </p>
+                    <p className="text-[11px] leading-snug text-slate-200">
+                      Culture & musique
                     </p>
                   </div>
-                ) : (
-                  <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {players.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/[0.08] border border-white/15"
-                      >
-                        <span className="font-medium text-white">{p.name}</span>
-                        <span className="text-xs uppercase tracking-wider text-sky-300">
-                          Pret
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
+                </button>
 
-            <div className="tvos-card p-7 md:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
-                  Mode de jeu
-                </span>
-
-                <div className="grid grid-cols-1 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMode('quiz')}
-                    className={`tvos-btn p-4 rounded-2xl text-left border cursor-pointer ${
-                      selectedMode === 'quiz'
-                        ? 'bg-sky-500/35 border-sky-300 text-white'
-                        : 'bg-white/[0.07] border-white/15 text-slate-200'
-                    }`}
-                  >
-                    <p className="font-semibold text-base">Quiz</p>
-                    <p className="text-xs text-slate-200 mt-0.5">
-                      Questions rapides et classement en direct
+                <button
+                  type="button"
+                  onClick={() => setSelectedMode('petit_bac')}
+                  className={`tvos-tile p-5 rounded-[26px] flex flex-col items-center justify-center text-center gap-3.5 border cursor-pointer ${
+                    selectedMode === 'petit_bac'
+                      ? 'bg-white/[0.22] border-sky-300 shadow-[0_18px_40px_-10px_rgba(14,165,233,0.45)]'
+                      : 'bg-white/[0.07] border-white/15 text-slate-200'
+                  }`}
+                >
+                  <PetitBacGameIcon selected={selectedMode === 'petit_bac'} />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-lg tracking-tight text-white">
+                      Petit Bac
                     </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMode('petit_bac')}
-                    className={`tvos-btn p-4 rounded-2xl text-left border cursor-pointer ${
-                      selectedMode === 'petit_bac'
-                        ? 'bg-sky-500/35 border-sky-300 text-white'
-                        : 'bg-white/[0.07] border-white/15 text-slate-200'
-                    }`}
-                  >
-                    <p className="font-semibold text-base">Petit Bac</p>
-                    <p className="text-xs text-slate-200 mt-0.5">
-                      Tirage de lettre et reponses par categorie
+                    <p className="text-[11px] leading-snug text-slate-200">
+                      Mots & catégories
                     </p>
-                  </button>
-                </div>
+                  </div>
+                </button>
               </div>
 
               <button
                 type="button"
                 onClick={handleStartGame}
-                className="tvos-btn w-full py-4 px-6 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-base tracking-tight shadow-lg cursor-pointer"
+                className="tvos-btn w-full py-4 px-6 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-base tracking-tight shadow-[0_14px_30px_-8px_rgba(14,165,233,0.6)] cursor-pointer"
               >
-                Lancer la partie
+                Lancer {selectedMode === 'petit_bac' ? 'le Petit Bac' : 'le Quiz'}
               </button>
+            </div>
+
+            {/* COLONNE DROITE : TABLEAU DES JOUEURS */}
+            <div className="lg:col-span-4 h-full p-6 md:p-8 rounded-[30px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 flex flex-col justify-between min-h-0">
+              <div className="flex items-center justify-between pb-4 border-b border-white/15 shrink-0">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
+                  Joueurs connectés
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/15 border border-white/20 text-white">
+                  {players.length}
+                </span>
+              </div>
+
+              <div className="flex-1 min-h-0 my-4 overflow-y-auto pr-1">
+                {players.length === 0 ? (
+                  <div className="h-full rounded-2xl bg-white/[0.05] border border-dashed border-white/20 flex flex-col items-center justify-center p-6 text-center space-y-2">
+                    <p className="text-base font-medium text-slate-200">
+                      En attente des joueurs...
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Les participants apparaîtront ici dès leur connexion.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl overflow-hidden border border-white/15 bg-white/[0.05]">
+                    <div className="grid grid-cols-12 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-300 bg-white/[0.06] border-b border-white/10">
+                      <span className="col-span-2">#</span>
+                      <span className="col-span-7">Joueur</span>
+                      <span className="col-span-3 text-right">Statut</span>
+                    </div>
+                    <ul className="divide-y divide-white/10">
+                      {players.map((p, idx) => (
+                        <li
+                          key={p.id}
+                          className="grid grid-cols-12 items-center px-4 py-3 text-sm"
+                        >
+                          <span className="col-span-2 font-semibold text-slate-400">
+                            {idx + 1}
+                          </span>
+                          <span className="col-span-7 font-semibold text-white truncate pr-2">
+                            {p.name}
+                          </span>
+                          <span className="col-span-3 text-right">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-400/20 border border-emerald-300/30 text-emerald-200">
+                              Prêt
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-white/15 text-center shrink-0">
+                <p className="text-xs text-slate-300">
+                  {players.length === 0
+                    ? 'Aucun participant dans le salon'
+                    : `${players.length} participant${players.length > 1 ? 's' : ''} prêt${players.length > 1 ? 's' : ''} à jouer`}
+                </p>
+              </div>
             </div>
           </div>
         )}
       </section>
 
-      <footer className="relative z-10 max-w-6xl w-full mx-auto text-center">
+      <footer className="relative z-10 max-w-7xl w-full mx-auto text-center shrink-0">
         <p className="text-xs tracking-wide text-slate-400">
-          Mode Hote • Synchronisation temps reel
+          Mode Hôte • Synchronisation temps réel
         </p>
       </footer>
     </main>
