@@ -20,9 +20,26 @@ interface Room {
 
 interface Player {
   id: string | number
-  room_id: string | number
-  name: string
+  room_code: string
+  pseudo: string
   score: number
+  is_connected?: boolean | null
+  client_id?: string | null
+  answer?: string | null
+}
+
+function getOrCreateClientId(): string {
+  if (typeof window === 'undefined') return ''
+  const key = 'tvos_player_client_id'
+  let id = window.localStorage.getItem(key)
+  if (!id) {
+    id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    window.localStorage.setItem(key, id)
+  }
+  return id
 }
 
 function PlayerContent() {
@@ -30,7 +47,7 @@ function PlayerContent() {
   const searchParams = useSearchParams()
 
   const [roomCode, setRoomCode] = useState('')
-  const [playerName, setPlayerName] = useState('')
+  const [playerPseudo, setPlayerPseudo] = useState('')
   const [room, setRoom] = useState<Room | null>(null)
   const [player, setPlayer] = useState<Player | null>(null)
   const [joining, setJoining] = useState(false)
@@ -43,27 +60,30 @@ function PlayerContent() {
     }
   }, [searchParams])
 
-  const syncRoomAndPlayer = useCallback(async (roomId: string | number, playerId: string | number) => {
-    const { data: updatedRoom } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('id', roomId)
-      .single()
+  const syncRoomAndPlayer = useCallback(
+    async (roomId: string | number, playerId: string | number) => {
+      const { data: updatedRoom } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('id', roomId)
+        .single()
 
-    if (updatedRoom) {
-      setRoom(updatedRoom)
-    }
+      if (updatedRoom) {
+        setRoom(updatedRoom)
+      }
 
-    const { data: updatedPlayer } = await supabase
-      .from('players')
-      .select('*')
-      .eq('id', playerId)
-      .single()
+      const { data: updatedPlayer } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', playerId)
+        .single()
 
-    if (updatedPlayer) {
-      setPlayer(updatedPlayer)
-    }
-  }, [])
+      if (updatedPlayer) {
+        setPlayer(updatedPlayer)
+      }
+    },
+    []
+  )
 
   useEffect(() => {
     if (!room?.id || !player?.id) return
@@ -100,13 +120,13 @@ function PlayerContent() {
     setErrorMsg(null)
 
     const cleanCode = roomCode.trim().toUpperCase()
-    const cleanName = playerName.trim()
+    const cleanPseudo = playerPseudo.trim()
 
     if (!cleanCode) {
       setErrorMsg('Entre le code du salon.')
       return
     }
-    if (!cleanName) {
+    if (!cleanPseudo) {
       setErrorMsg('Entre ton pseudo.')
       return
     }
@@ -122,14 +142,24 @@ function PlayerContent() {
       .single()
 
     if (roomError || !foundRoom) {
-      setErrorMsg('Salon introuvable. Verifie le code.')
+      setErrorMsg('Salon introuvable. Vérifie le code.')
       setJoining(false)
       return
     }
 
+    const clientId = getOrCreateClientId()
+
     const { data: createdPlayer, error: playerError } = await supabase
       .from('players')
-      .insert([{ room_id: foundRoom.id, name: cleanName, score: 0 }])
+      .insert([
+        {
+          room_code: foundRoom.room_code,
+          pseudo: cleanPseudo,
+          score: 0,
+          is_connected: true,
+          client_id: clientId || null,
+        },
+      ])
       .select()
       .single()
 
@@ -144,7 +174,13 @@ function PlayerContent() {
     setJoining(false)
   }
 
-  const handleLeaveRoom = () => {
+  const handleLeaveRoom = async () => {
+    if (player?.id) {
+      await supabase
+        .from('players')
+        .update({ is_connected: false })
+        .eq('id', player.id)
+    }
     setPlayer(null)
     setRoom(null)
     setErrorMsg(null)
@@ -221,7 +257,7 @@ function PlayerContent() {
                 Rejoindre la partie
               </h1>
               <p className="text-xs sm:text-sm text-slate-300">
-                Entre le code affiche sur l&apos;ecran TV et ton pseudo
+                Entre le code affiché sur l&apos;écran TV et ton pseudo
               </p>
             </div>
 
@@ -248,17 +284,17 @@ function PlayerContent() {
 
               <div className="space-y-1.5">
                 <label
-                  htmlFor="player-name"
+                  htmlFor="player-pseudo"
                   className="block text-xs font-semibold uppercase tracking-[0.15em] text-slate-200"
                 >
                   Ton pseudo
                 </label>
                 <input
-                  id="player-name"
+                  id="player-pseudo"
                   type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="Ton prenom ou pseudo"
+                  value={playerPseudo}
+                  onChange={(e) => setPlayerPseudo(e.target.value)}
+                  placeholder="Ton prénom ou pseudo"
                   maxLength={24}
                   className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/55 border border-white/25 text-white text-base font-medium placeholder:text-slate-500 focus:outline-none focus:border-sky-300"
                 />
@@ -295,7 +331,7 @@ function PlayerContent() {
                 <p className="text-xs uppercase tracking-[0.15em] text-slate-300">
                   Joueur
                 </p>
-                <p className="text-xl font-semibold text-white">{player.name}</p>
+                <p className="text-xl font-semibold text-white">{player.pseudo}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs uppercase tracking-[0.15em] text-slate-300">
@@ -307,12 +343,12 @@ function PlayerContent() {
 
             <div className="py-6 px-4 rounded-2xl bg-white/[0.06] border border-white/15 text-center space-y-2">
               <p className="text-lg font-semibold text-white">
-                Regarde l&apos;ecran TV
+                Regarde l&apos;écran TV
               </p>
               <p className="text-xs sm:text-sm text-slate-300">
                 {room.game_type === 'petit_bac'
-                  ? 'La lettre est affichee sur la TV : prepare tes mots.'
-                  : 'La question est affichee sur la TV : prepare ta reponse.'}
+                  ? 'La lettre est affichée sur la TV : prépare tes mots.'
+                  : 'La question est affichée sur la TV : prépare ta réponse.'}
               </p>
             </div>
 
@@ -328,13 +364,16 @@ function PlayerContent() {
           <div className="tvos-card p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 text-center space-y-6">
             <div className="space-y-1">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] bg-emerald-400/20 border border-emerald-300/35 text-emerald-200">
-                Connecte
+                Connecté
               </span>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white pt-2">
-                {player.name}
+                {player.pseudo}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300">
-                Salon <span className="font-semibold text-white tracking-widest">{room.room_code}</span>
+                Salon{' '}
+                <span className="font-semibold text-white tracking-widest">
+                  {room.room_code}
+                </span>
               </p>
             </div>
 
@@ -343,7 +382,7 @@ function PlayerContent() {
                 En attente du lancement...
               </p>
               <p className="text-xs sm:text-sm text-slate-300">
-                L&apos;hote va bientot lancer la partie depuis la TV.
+                L&apos;hôte va bientôt lancer la partie depuis la TV.
               </p>
             </div>
 
@@ -360,7 +399,7 @@ function PlayerContent() {
 
       <footer className="relative z-10 max-w-xl w-full mx-auto text-center">
         <p className="text-xs tracking-wide text-slate-400">
-          Manette joueur • Synchronisation temps reel
+          Manette joueur • Synchronisation temps réel
         </p>
       </footer>
     </main>
