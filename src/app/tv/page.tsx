@@ -28,7 +28,7 @@ interface Room {
   config?: Record<string, unknown> | null
 }
 
-const RANDOM_BADGE_COLORS = [
+const RANDOM_PLAYER_COLORS = [
   '#2563eb', // Bleu roi
   '#059669', // Vert émeraude
   '#d97706', // Ambre vif
@@ -52,7 +52,7 @@ function resolvePlayerColor(player: Player, index: number): string {
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   }
-  return RANDOM_BADGE_COLORS[(hash + index) % RANDOM_BADGE_COLORS.length]
+  return RANDOM_PLAYER_COLORS[(hash + index) % RANDOM_PLAYER_COLORS.length]
 }
 
 function generateRoomCode(): string {
@@ -477,18 +477,14 @@ export default function TvPage() {
                       return (
                         <li
                           key={p.id}
-                          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-white/[0.08] border border-white/15"
+                          style={{ backgroundColor: colorHex }}
+                          className="flex items-center justify-between px-4 py-3 rounded-2xl border-2 border-white/40 text-white shadow-md"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <span
-                              style={{ backgroundColor: colorHex }}
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white border border-white/40 shrink-0 shadow-sm"
-                            >
-                              {idx + 1}
-                            </span>
-                            <span className="font-medium text-white truncate">{p.pseudo}</span>
+                            <span className="font-bold text-white/90">{idx + 1}.</span>
+                            <span className="font-bold text-white truncate">{p.pseudo}</span>
                           </div>
-                          <span className="font-semibold text-sky-300">{p.score} pts</span>
+                          <span className="font-bold text-white">{p.score} pts</span>
                         </li>
                       )
                     })}
@@ -614,44 +610,30 @@ export default function TvPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-2xl overflow-hidden border border-white/15 bg-white/[0.05]">
-                    <div className="grid grid-cols-12 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-300 bg-white/[0.06] border-b border-white/10">
-                      <span className="col-span-2">#</span>
-                      <span className="col-span-6">Joueur</span>
-                      <span className="col-span-4 text-right">Statut</span>
-                    </div>
-                    <ul className="divide-y divide-white/10">
-                      {players.map((p, idx) => {
-                        const colorHex = resolvePlayerColor(p, idx)
-                        return (
-                          <li
-                            key={p.id}
-                            className="grid grid-cols-12 items-center px-4 py-3 text-sm"
-                          >
-                            <span className="col-span-2">
-                              <span
-                                style={{ backgroundColor: colorHex }}
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white border border-white/40 shadow-sm"
-                              >
-                                {idx + 1}
-                              </span>
+                  <ul className="space-y-2.5">
+                    {players.map((p, idx) => {
+                      const colorHex = resolvePlayerColor(p, idx)
+                      return (
+                        <li
+                          key={p.id}
+                          style={{ backgroundColor: colorHex }}
+                          className="flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 border-white/45 text-white shadow-md"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xs font-bold uppercase tracking-wider text-white/90">
+                              #{idx + 1}
                             </span>
-                            <span className="col-span-6 font-semibold text-white truncate pr-2">
+                            <span className="font-bold text-base text-white truncate">
                               {p.pseudo}
                             </span>
-                            <span className="col-span-4 text-right">
-                              <span
-                                style={{ backgroundColor: colorHex }}
-                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white border border-white/40 shadow-sm"
-                              >
-                                Prêt
-                              </span>
-                            </span>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
+                          </div>
+                          <span className="text-xs font-bold uppercase tracking-wider text-white bg-black/20 px-2.5 py-1 rounded-full">
+                            Prêt
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
                 )}
               </div>
 
