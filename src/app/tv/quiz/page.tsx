@@ -3,8 +3,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { QUESTIONS, type QuizQuestion } from '@/data/questions';
 
 type GameMode = 'quiz' | 'petit-bac';
+type OptionLetter = 'A' | 'B' | 'C' | 'D';
+
+const OPTION_LETTERS: OptionLetter[] = ['A', 'B', 'C', 'D'];
 
 interface RoomConfig {
   game_mode?: GameMode;
@@ -30,14 +34,6 @@ interface PlayerRow {
   client_id: string | null;
 }
 
-interface QuizQuestion {
-  id: number;
-  category: string;
-  question: string;
-  options: string[];
-  correctIndex: number;
-}
-
 interface CardPalette {
   bg: string;
   border: string;
@@ -52,28 +48,28 @@ interface OptionColorStyle {
   letterBadgeBg: string;
 }
 
-const OPTION_STYLES: OptionColorStyle[] = [
-  {
+const OPTION_STYLES: Record<OptionLetter, OptionColorStyle> = {
+  A: {
     bg: '#dc2626',
     border: '#fca5a5',
     letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
   },
-  {
+  B: {
     bg: '#eab308',
     border: '#fde047',
     letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
   },
-  {
+  C: {
     bg: '#2563eb',
     border: '#93c5fd',
     letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
   },
-  {
+  D: {
     bg: '#16a34a',
     border: '#86efac',
     letterBadgeBg: 'rgba(15, 23, 42, 0.35)',
   },
-];
+};
 
 const CARD_PALETTES: CardPalette[] = [
   {
@@ -134,30 +130,13 @@ const CARD_PALETTES: CardPalette[] = [
   },
 ];
 
-const BASE_QUESTIONS: QuizQuestion[] = [
-  {
-    id: 1,
-    category: 'Culture Générale',
-    question: 'Quelle est la capitale de la Belgique ?',
-    options: ['Anvers', 'Bruxelles', 'Liège', 'Gand'],
-    correctIndex: 1,
-  },
-  {
-    id: 2,
-    category: 'Sciences',
-    question: 'Quelle planète est la plus proche du Soleil ?',
-    options: ['Vénus', 'Mars', 'Mercure', 'Jupiter'],
-    correctIndex: 2,
-  },
-  {
-    id: 3,
-    category: 'Musique & Cinéma',
-    question: 'Combien de notes comporte une gamme diatonique majeure ?',
-    options: ['5 notes', '6 notes', '7 notes', '8 notes'],
-    correctIndex: 2,
-  },
-];
+const FALLBACK_QUESTION: QuizQuestion = {
+  question: 'Quelle est la capitale de la Belgique ?',
+  options: { A: 'Bruxelles', B: 'Anvers', C: 'Liège', D: 'Gand' },
+  correct: 'A',
+};
 
+const QUESTION_BANK: QuizQuestion[] = QUESTIONS.length > 0 ? QUESTIONS : [FALLBACK_QUESTION];
 const QUIZ_DURATION = 12;
 
 function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
@@ -274,7 +253,7 @@ export default function TvQuizPage() {
       setRoom(targetRoom);
       const cfg = parseConfig(targetRoom.config);
       if (typeof cfg.question_index === 'number' && cfg.question_index >= 0) {
-        const normalizedIdx = cfg.question_index % BASE_QUESTIONS.length;
+        const normalizedIdx = cfg.question_index % QUESTION_BANK.length;
         setQuestionIndex((prev) => {
           if (prev !== normalizedIdx) {
             setTimeLeft(QUIZ_DURATION);
@@ -360,7 +339,7 @@ export default function TvQuizPage() {
     if (timeLeft > 0) return;
 
     const normalized =
-      ((nextIdx % BASE_QUESTIONS.length) + BASE_QUESTIONS.length) % BASE_QUESTIONS.length;
+      ((nextIdx % QUESTION_BANK.length) + QUESTION_BANK.length) % QUESTION_BANK.length;
     setQuestionIndex(normalized);
     setTimeLeft(QUIZ_DURATION);
 
@@ -394,7 +373,7 @@ export default function TvQuizPage() {
   };
 
   const activeRoomCode = room?.room_code || roomCode || 'SALON';
-  const currentQuestion = BASE_QUESTIONS[questionIndex] || BASE_QUESTIONS[0];
+  const currentQuestion = QUESTION_BANK[questionIndex] || QUESTION_BANK[0];
   const isTimeOver = timeLeft <= 0;
   const isDangerBlink = timeLeft > 0 && timeLeft <= 5;
   const usedPaletteIndices = new Set<number>();
@@ -457,7 +436,7 @@ export default function TvQuizPage() {
         </div>
 
         <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
-          Question {questionIndex + 1} / {BASE_QUESTIONS.length}
+          Question {questionIndex + 1} / {QUESTION_BANK.length}
         </span>
       </header>
 
@@ -476,10 +455,7 @@ export default function TvQuizPage() {
             </span>
           </div>
 
-          <div className="mt-6 mb-3 px-4 sm:px-10 text-center flex flex-col items-center justify-center gap-2 shrink-0">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-              {currentQuestion.category}
-            </span>
+          <div className="mt-6 mb-3 px-4 sm:px-10 text-center flex flex-col items-center justify-center shrink-0">
             <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white leading-tight max-w-4xl">
               {currentQuestion.question}
             </h1>
@@ -487,14 +463,15 @@ export default function TvQuizPage() {
 
           <div className="mt-auto mb-6 flex flex-col gap-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {currentQuestion.options.map((opt, idx) => {
-                const colorStyle = OPTION_STYLES[idx] || OPTION_STYLES[0];
-                const isCorrect = isTimeOver && idx === currentQuestion.correctIndex;
-                const isDimmed = isTimeOver && idx !== currentQuestion.correctIndex;
+              {OPTION_LETTERS.map((letter) => {
+                const colorStyle = OPTION_STYLES[letter];
+                const optionText = currentQuestion.options[letter];
+                const isCorrect = isTimeOver && letter === currentQuestion.correct;
+                const isDimmed = isTimeOver && letter !== currentQuestion.correct;
 
                 return (
                   <div
-                    key={opt}
+                    key={letter}
                     style={{
                       backgroundColor: colorStyle.bg,
                       borderColor: isCorrect ? '#ffffff' : colorStyle.border,
@@ -510,11 +487,11 @@ export default function TvQuizPage() {
                       style={{ backgroundColor: colorStyle.letterBadgeBg }}
                       className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl font-black text-white shrink-0"
                     >
-                      {String.fromCharCode(65 + idx)}
+                      {letter}
                     </span>
 
                     <span className="flex-1 text-center text-3xl sm:text-4xl font-bold text-white truncate">
-                      {opt}
+                      {optionText}
                     </span>
 
                     <span className="w-14 shrink-0" aria-hidden="true" />
