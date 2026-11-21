@@ -1,22 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-interface Room {
-  id: string | number
-  room_code: string
-  status: string
-  game_type: string | null
-  current_game?: string | null
-  current_round?: number | null
-  config?: Record<string, unknown> | null
-}
 
 interface Player {
   id: string | number
@@ -28,49 +18,58 @@ interface Player {
   avatar?: string | null
 }
 
-const RANDOM_PLAYER_COLORS = [
-  '#2563eb', // Bleu roi
-  '#059669', // Vert émeraude
-  '#d97706', // Ambre vif
-  '#7c3aed', // Violet intense
-  '#e11d48', // Rouge framboise
-  '#0891b2', // Cyan soutenu
-  '#c026d3', // Magenta
-  '#ea580c', // Orange brûlé
-  '#4f46e5', // Indigo
-  '#16a34a', // Vert pomme
-  '#db2777', // Rose vif
-  '#0d9488', // Turquoise foncé
-]
-
-function pickRandomPlayerColor(): string {
-  const idx = Math.floor(Math.random() * RANDOM_PLAYER_COLORS.length)
-  return RANDOM_PLAYER_COLORS[idx]
+interface Room {
+  id: string | number
+  room_code: string
+  status: string
+  game_type: string | null
+  current_game?: string | null
+  current_round?: number | null
+  config?: {
+    quiz_started?: boolean
+    question_index?: number
+    time_left?: number
+    [key: string]: unknown
+  } | null
 }
 
-function resolvePlayerColor(
-  player: Pick<Player, 'avatar' | 'id' | 'pseudo' | 'client_id'>
-): string {
-  if (player.avatar && player.avatar.startsWith('#')) {
-    return player.avatar
-  }
-  const seed = String(player.client_id ?? player.id ?? player.pseudo ?? '0')
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
-  }
-  return RANDOM_PLAYER_COLORS[hash % RANDOM_PLAYER_COLORS.length]
+type ChoiceLetter = 'A' | 'B' | 'C' | 'D'
+
+const CHOICE_BUTTONS: { letter: ChoiceLetter; bg: string; border: string }[] = [
+  { letter: 'A', bg: '#dc2626', border: '#fca5a5' },
+  { letter: 'B', bg: '#eab308', border: '#fef08a' },
+  { letter: 'C', bg: '#2563eb', border: '#93c5fd' },
+  { letter: 'D', bg: '#16a34a', border: '#86efac' },
+]
+
+const RANDOM_PLAYER_COLORS = [
+  '#2563eb',
+  '#059669',
+  '#d97706',
+  '#7c3aed',
+  '#e11d48',
+  '#0891b2',
+  '#c026d3',
+  '#ea580c',
+  '#4f46e5',
+  '#16a34a',
+  '#db2777',
+  '#0d9488',
+]
+
+function pickRandomColor(): string {
+  return RANDOM_PLAYER_COLORS[Math.floor(Math.random() * RANDOM_PLAYER_COLORS.length)]
 }
 
 function getOrCreateClientId(): string {
   if (typeof window === 'undefined') return ''
-  const key = 'tvos_player_client_id'
+  const key = 'tvos_party_client_id'
   let id = window.localStorage.getItem(key)
   if (!id) {
     id =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+        : `client_${Math.random().toString(36).slice(2, 11)}`
     window.localStorage.setItem(key, id)
   }
   return id
@@ -78,66 +77,79 @@ function getOrCreateClientId(): string {
 
 function PlayerContent() {
   const searchParams = useSearchParams()
+  const initialCode = (searchParams.get('code') || '').trim().toUpperCase()
 
-  const [roomCode, setRoomCode] = useState('')
-  const [playerPseudo, setPlayerPseudo] = useState('')
-  const [room, setRoom] = useState<Room | null>(null)
+  const [roomCode, setRoomCode] = useState(initialCode)
+  const [pseudo, setPseudo] = useState('')
+  const [playerColor, setPlayerColor] = useState<string>(pickRandomColor)
   const [player, setPlayer] = useState<Player | null>(null)
+  const [room, setRoom] = useState<Room | null>(null)
   const [joining, setJoining] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [selectedChoice, setSelectedChoice] = useState<ChoiceLetter | null>(null)
+  const [answeredQuestionIdx, setAnsweredQuestionIdx] = useState<number | null>(null)
 
   useEffect(() => {
-    const codeFromUrl = searchParams.get('code')
-    if (codeFromUrl) {
-      setRoomCode(codeFromUrl.toUpperCase().trim())
+    if (initialCode) {
+      setRoomCode(initialCode)
     }
-  }, [searchParams])
+  }, [initialCode])
 
-  const syncRoomAndPlayer = useCallback(
-    async (roomId: string | number, playerId: string | number) => {
-      const { data: updatedRoom } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('id', roomId)
-        .single()
+  const refreshRoomAndPlayer = useCallback(async (code: string, playerId?: string | number) => {
+    const cleanCode = code.trim().toUpperCase()
+    if (!cleanCode) return
 
-      if (updatedRoom) {
-        setRoom(updatedRoom)
-      }
+    const { data: roomData } = await supabase
+      .from('rooms')
+      .select('*')
+      .ilike('room_code', cleanCode)
+      .maybeSingle()
 
-      const { data: updatedPlayer } = await supabase
+    if (roomData) {
+      setRoom(roomData)
+    }
+
+    if (playerId !== undefined) {
+      const { data: playerData } = await supabase
         .from('players')
         .select('*')
         .eq('id', playerId)
-        .single()
+        .maybeSingle()
 
-      if (updatedPlayer) {
-        setPlayer(updatedPlayer)
+      if (playerData) {
+        setPlayer(playerData)
+        if (playerData.avatar && playerData.avatar.startsWith('#')) {
+          setPlayerColor(playerData.avatar)
+        }
       }
-    },
-    []
-  )
+    }
+  }, [])
 
   useEffect(() => {
-    if (!room?.id || !player?.id) return
+    const activeCode = (player?.room_code || roomCode).trim().toUpperCase()
+    if (!activeCode) return
 
-    syncRoomAndPlayer(room.id, player.id)
+    void refreshRoomAndPlayer(activeCode, player?.id)
 
     const channel = supabase
-      .channel(`player-session-${room.id}-${player.id}`)
+      .channel(`player-sync-${activeCode}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room.id}` },
+        { event: '*', schema: 'public', table: 'rooms' },
         (payload) => {
-          setRoom(payload.new as Room)
+          const updated = payload.new as Room | undefined
+          if (updated && String(updated.room_code || '').toUpperCase() === activeCode) {
+            setRoom(updated)
+          }
         }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${player.id}` },
+        { event: '*', schema: 'public', table: 'players' },
         (payload) => {
-          if (payload.new) {
-            setPlayer(payload.new as Player)
+          const updated = payload.new as Player | undefined
+          if (player?.id && updated && String(updated.id) === String(player.id)) {
+            setPlayer(updated)
           }
         }
       )
@@ -146,98 +158,91 @@ function PlayerContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [room?.id, player?.id, syncRoomAndPlayer])
+  }, [player?.id, player?.room_code, roomCode, refreshRoomAndPlayer])
 
-  const handleJoinRoom = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorMsg(null)
+  const quizStarted = Boolean(room?.config?.quiz_started)
+  const questionIndex =
+    typeof room?.config?.question_index === 'number' ? room.config.question_index : 0
+  const timeLeft = typeof room?.config?.time_left === 'number' ? room.config.time_left : 15
+  const activeGameType = room?.game_type || room?.current_game || 'quiz'
 
-    const cleanCode = roomCode.trim().toUpperCase()
-    const cleanPseudo = playerPseudo.trim()
-
-    if (!cleanCode) {
-      setErrorMsg('Entre le code du salon.')
-      return
+  useEffect(() => {
+    if (!quizStarted || answeredQuestionIdx !== questionIndex) {
+      setSelectedChoice(null)
     }
-    if (!cleanPseudo) {
-      setErrorMsg('Entre ton pseudo.')
+  }, [quizStarted, questionIndex, answeredQuestionIdx])
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanCode = roomCode.trim().toUpperCase()
+    const cleanPseudo = pseudo.trim()
+
+    if (!cleanCode || !cleanPseudo) {
+      setErrorMsg('Entre un code salon et un pseudo.')
       return
     }
 
     setJoining(true)
+    setErrorMsg(null)
 
-    const { data: foundRoom, error: roomError } = await supabase
+    const { data: roomData, error: roomErr } = await supabase
       .from('rooms')
       .select('*')
       .ilike('room_code', cleanCode)
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (roomError || !foundRoom) {
-      setErrorMsg('Salon introuvable. Vérifie le code.')
+    if (roomErr || !roomData) {
+      setErrorMsg('Salon introuvable.')
       setJoining(false)
       return
     }
 
     const clientId = getOrCreateClientId()
-    const assignedColor = pickRandomPlayerColor()
+    const chosenColor = playerColor || pickRandomColor()
 
-    const { data: createdPlayer, error: playerError } = await supabase
+    const { data: inserted, error: insertErr } = await supabase
       .from('players')
       .insert([
         {
-          room_code: foundRoom.room_code,
+          room_code: roomData.room_code,
           pseudo: cleanPseudo,
           score: 0,
           is_connected: true,
-          client_id: clientId || null,
-          avatar: assignedColor,
+          client_id: clientId,
+          avatar: chosenColor,
         },
       ])
       .select()
       .single()
 
-    if (playerError || !createdPlayer) {
-      setErrorMsg(playerError?.message || 'Impossible de rejoindre le salon.')
+    if (insertErr || !inserted) {
+      setErrorMsg(insertErr?.message || 'Connexion impossible.')
       setJoining(false)
       return
     }
 
-    setRoom(foundRoom)
-    setPlayer({ ...createdPlayer, avatar: createdPlayer.avatar || assignedColor })
+    setPlayer(inserted)
+    setPlayerColor(chosenColor)
+    setRoom(roomData)
     setJoining(false)
   }
 
-  const playerColor = player ? resolvePlayerColor(player) : RANDOM_PLAYER_COLORS[0]
+  const handleSelectChoice = (letter: ChoiceLetter) => {
+    if (!quizStarted || timeLeft <= 0) return
+    setSelectedChoice(letter)
+    setAnsweredQuestionIdx(questionIndex)
+  }
+
+  const badgeBg = player?.avatar && player.avatar.startsWith('#') ? player.avatar : playerColor
 
   return (
-    <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex items-center justify-center px-5 py-6 sm:px-8 sm:py-8">
+    <main className="relative h-screen w-screen overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between p-5">
       <style>{`
         html, body {
-          height: 100%;
           overflow: hidden;
           overscroll-behavior: none;
-          touch-action: none;
+          touch-action: manipulation;
           font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-        }
-        .tvos-card {
-          transition:
-            transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
-            box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
-            border-color 220ms ease;
-        }
-        .tvos-btn {
-          transition:
-            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-            box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
-            background 200ms ease;
-        }
-        .tvos-btn:hover,
-        .tvos-btn:focus-visible {
-          transform: scale(1.02);
-          box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
-          outline: none;
         }
       `}</style>
 
@@ -245,139 +250,120 @@ function PlayerContent() {
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_85%_60%_at_50%_0%,rgba(59,130,246,0.34),rgba(14,23,42,0))]"
       />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
-      />
 
-      <section className="relative z-10 max-w-xl w-full mx-auto flex items-center justify-center">
-        {!player || !room ? (
-          <form
-            onSubmit={handleJoinRoom}
-            className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-5"
+      {!player ? (
+        <form
+          onSubmit={handleJoin}
+          className="relative z-10 m-auto w-full max-w-sm p-6 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/75 backdrop-blur-2xl border border-white/25 space-y-4"
+        >
+          <div className="text-center space-y-1">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">
+              tvOS • Joueur
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Rejoindre
+            </h1>
+          </div>
+
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              placeholder="CODE SALON"
+              maxLength={8}
+              className="w-full px-4 py-3.5 rounded-2xl bg-white/15 border border-white/25 text-white placeholder:text-slate-400 text-center text-xl font-bold tracking-[0.2em] uppercase focus:outline-none focus:border-sky-300"
+            />
+            <input
+              type="text"
+              value={pseudo}
+              onChange={(e) => setPseudo(e.target.value)}
+              placeholder="Ton pseudo"
+              maxLength={18}
+              className="w-full px-4 py-3.5 rounded-2xl bg-white/15 border border-white/25 text-white placeholder:text-slate-400 text-center text-lg font-semibold focus:outline-none focus:border-sky-300"
+            />
+          </div>
+
+          {errorMsg && (
+            <p className="text-center text-xs font-semibold text-rose-300">
+              {errorMsg}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={joining}
+            className="w-full py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white font-bold text-base tracking-tight shadow-lg cursor-pointer"
           >
-            <div className="space-y-1 text-center">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
-                Connexion au salon
+            {joining ? 'Connexion...' : 'Entrer'}
+          </button>
+        </form>
+      ) : (
+        <div className="relative z-10 h-full w-full max-w-md mx-auto flex flex-col justify-between gap-4">
+          <div
+            style={{ backgroundColor: badgeBg }}
+            className="px-4 py-3 rounded-2xl border-2 border-white/45 flex items-center justify-between text-white shadow-md shrink-0"
+          >
+            <span className="font-extrabold text-base truncate">{player.pseudo}</span>
+            <span className="font-extrabold text-sm bg-black/25 px-3 py-1 rounded-full shrink-0">
+              {player.score} pts
+            </span>
+          </div>
+
+          {room?.status === 'playing' && activeGameType === 'quiz' && quizStarted ? (
+            <div className="flex-1 min-h-0 flex flex-col justify-between gap-3">
+              <div className="flex items-center justify-between px-1 shrink-0">
+                <span className="text-xs font-bold uppercase tracking-[0.16em] text-sky-200">
+                  Question {questionIndex + 1}
+                </span>
+                <span className="text-xs font-extrabold uppercase tracking-[0.14em] text-white bg-white/15 px-3 py-1 rounded-full">
+                  {timeLeft > 0 ? `${timeLeft}s` : 'Terminé'}
+                </span>
+              </div>
+
+              <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-3.5">
+                {CHOICE_BUTTONS.map((btn) => {
+                  const isPicked = selectedChoice === btn.letter
+                  const isLocked = timeLeft <= 0
+
+                  return (
+                    <button
+                      key={btn.letter}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => handleSelectChoice(btn.letter)}
+                      style={{
+                        backgroundColor: btn.bg,
+                        borderColor: isPicked ? '#ffffff' : btn.border,
+                      }}
+                      className={`h-full w-full rounded-[26px] flex items-center justify-center text-5xl font-black text-white transition-all duration-150 cursor-pointer disabled:cursor-not-allowed ${
+                        isPicked
+                          ? 'border-4 ring-4 ring-white/80 scale-[0.98] shadow-[0_0_28px_rgba(255,255,255,0.55)]'
+                          : isLocked
+                          ? 'border-2 opacity-40'
+                          : 'border-2 opacity-100 active:scale-95 shadow-lg'
+                      }`}
+                    >
+                      {btn.letter}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/70 backdrop-blur-2xl border border-white/25 flex flex-col items-center justify-center p-6 text-center space-y-2">
+              <span className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">
+                Salon {player.room_code}
               </span>
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-                Rejoindre la partie
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-300">
-                Entre le code affiché sur l&apos;écran TV et ton pseudo
+              <p className="text-2xl font-bold text-white">
+                {room?.status === 'playing' && activeGameType === 'quiz'
+                  ? 'En attente du démarrage...'
+                  : 'Prêt sur la TV'}
               </p>
             </div>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="room-code"
-                  className="block text-xs font-semibold uppercase tracking-[0.15em] text-slate-200"
-                >
-                  Code du salon
-                </label>
-                <input
-                  id="room-code"
-                  type="text"
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="EX : V6HA3A"
-                  maxLength={10}
-                  autoCapitalize="characters"
-                  autoCorrect="off"
-                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/55 border border-white/25 text-white text-center text-xl font-semibold tracking-[0.22em] placeholder:text-slate-500 placeholder:tracking-normal placeholder:text-sm focus:outline-none focus:border-sky-300"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="player-pseudo"
-                  className="block text-xs font-semibold uppercase tracking-[0.15em] text-slate-200"
-                >
-                  Ton pseudo
-                </label>
-                <input
-                  id="player-pseudo"
-                  type="text"
-                  value={playerPseudo}
-                  onChange={(e) => setPlayerPseudo(e.target.value)}
-                  placeholder="Ton prénom ou pseudo"
-                  maxLength={24}
-                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/55 border border-white/25 text-white text-base font-medium placeholder:text-slate-500 focus:outline-none focus:border-sky-300"
-                />
-              </div>
-            </div>
-
-            {errorMsg && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/20 border border-rose-300/40 text-rose-100 text-xs sm:text-sm text-center">
-                {errorMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={joining}
-              className="tvos-btn w-full py-4 px-6 rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:opacity-60 text-white font-semibold text-base tracking-tight shadow-[0_14px_30px_-8px_rgba(14,165,233,0.65)] cursor-pointer"
-            >
-              {joining ? 'Connexion...' : 'Rejoindre le salon'}
-            </button>
-          </form>
-        ) : room.status === 'playing' ? (
-          <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 space-y-6">
-            <div
-              style={{ backgroundColor: playerColor }}
-              className="p-5 rounded-2xl border-2 border-white/50 flex items-center justify-between gap-4 shadow-lg"
-            >
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.15em] text-white/85 font-semibold">
-                  {room.game_type === 'petit_bac' ? 'Petit Bac' : 'Quiz'} • {room.room_code}
-                </p>
-                <p className="text-2xl font-bold text-white truncate">{player.pseudo}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs uppercase tracking-[0.15em] text-white/85 font-semibold">
-                  Score
-                </p>
-                <p className="text-2xl font-bold text-white">{player.score} pts</p>
-              </div>
-            </div>
-
-            <div className="py-6 px-4 rounded-2xl bg-white/[0.06] border border-white/15 text-center space-y-2">
-              <p className="text-lg font-semibold text-white">
-                Regarde l&apos;écran TV
-              </p>
-              <p className="text-xs sm:text-sm text-slate-300">
-                {room.game_type === 'petit_bac'
-                  ? 'La lettre est affichée sur la TV : prépare tes mots.'
-                  : 'La question est affichée sur la TV : prépare ta réponse.'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 text-center space-y-6">
-            <div
-              style={{ backgroundColor: playerColor }}
-              className="w-full py-6 px-5 rounded-[24px] border-2 border-white/50 shadow-lg space-y-1.5"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/90">
-                Salon {room.room_code}
-              </p>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-                {player.pseudo}
-              </h1>
-            </div>
-
-            <div className="py-6 px-4 rounded-2xl bg-white/[0.06] border border-white/15 space-y-1.5">
-              <p className="text-base font-medium text-white">
-                En attente du lancement...
-              </p>
-              <p className="text-xs sm:text-sm text-slate-300">
-                L&apos;hôte va bientôt lancer la partie depuis la TV.
-              </p>
-            </div>
-          </div>
-        )}
-      </section>
+          )}
+        </div>
+      )}
     </main>
   )
 }
@@ -386,8 +372,8 @@ export default function PlayerPage() {
   return (
     <Suspense
       fallback={
-        <main className="h-screen w-full overflow-hidden bg-[#0e172a] text-white flex items-center justify-center p-6">
-          <p className="text-sm text-slate-300">Chargement...</p>
+        <main className="h-screen w-screen overflow-hidden bg-[#0e172a] text-white flex items-center justify-center">
+          <p className="text-lg font-semibold">Chargement...</p>
         </main>
       }
     >
