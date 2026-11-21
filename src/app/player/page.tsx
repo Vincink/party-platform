@@ -80,13 +80,14 @@ function computeDenseRankForPlayer(players: PlayerRow[], targetId: number | null
   return 1
 }
 
-function parseBacStatus(status: string): { letter: string; category: string } | null {
+function parseBacStatus(status: string): { roundIdx: string; letter: string; category: string } | null {
   if (!status.startsWith('bac_playing:')) return null
   const parts = status.split(':')
+  const roundIdx = parts[1] || '0'
   const letter = (parts[2] || '').toUpperCase()
   const category = parts[3] ? decodeURIComponent(parts[3]) : ''
   if (!letter || !category) return null
-  return { letter, category }
+  return { roundIdx, letter, category }
 }
 
 function PlayerContent() {
@@ -100,7 +101,7 @@ function PlayerContent() {
   const [selectedAnswer, setSelectedAnswer] = useState<ChoiceKey | null>(null)
   const [bacWordInput, setBacWordInput] = useState<string>('')
   const [bacSubmittedWord, setBacSubmittedWord] = useState<string | null>(null)
-  const [bacPrompt, setBacPrompt] = useState<{ letter: string; category: string } | null>(null)
+  const [bacPrompt, setBacPrompt] = useState<{ roundIdx: string; letter: string; category: string } | null>(null)
   const [score, setScore] = useState<number>(0)
   const [rank, setRank] = useState<number>(1)
   const [gameType, setGameType] = useState<GameType>('quiz')
@@ -114,7 +115,6 @@ function PlayerContent() {
   const lockedAnswerRef = useRef<ChoiceKey | null>(null)
   const submittingAnswerRef = useRef<boolean>(false)
   const lastRoomStatusRef = useRef<string>('')
-  const bacInputRef = useRef<HTMLInputElement | null>(null)
   const scoreRef = useRef<number>(0)
   const lastTapRef = useRef<number>(0)
 
@@ -269,9 +269,6 @@ function PlayerContent() {
         setBacPrompt(parsedBac)
         if (prevStatus !== nextStatus) {
           resetRoundInputs()
-          window.setTimeout(() => {
-            bacInputRef.current?.focus()
-          }, 50)
         }
         lastRoomStatusRef.current = nextStatus
         return
@@ -578,19 +575,17 @@ function PlayerContent() {
   const theme = getPlayerColorTheme(playerId ?? 0)
 
   const editableInputStyle: React.CSSProperties = {
-    touchAction: 'manipulation',
+    touchAction: 'auto',
     userSelect: 'text',
     WebkitUserSelect: 'text',
   }
 
   return (
-    <main
-      style={{ touchAction: 'none' }}
-      className="h-dvh w-screen fixed inset-0 overflow-hidden overscroll-none select-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5"
-    >
+    <main className="h-dvh w-screen fixed inset-0 overflow-hidden overscroll-none bg-slate-950 text-white flex flex-col px-4 pt-12 pb-5">
       {!joined ? (
         <form
           onSubmit={handleJoin}
+          style={{ touchAction: 'auto' }}
           className="max-w-md w-full mx-auto my-auto bg-slate-900 border border-slate-800 p-7 rounded-3xl shadow-2xl space-y-5"
         >
           <div className="text-center space-y-1">
@@ -651,7 +646,7 @@ function PlayerContent() {
         <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between gap-4 overflow-visible">
           <div
             style={getPlayerNeonStyle(playerId ?? 0)}
-            className="bg-slate-900/90 border-4 px-4 py-3 rounded-3xl flex items-center justify-between gap-3"
+            className="bg-slate-900/90 border-4 px-4 py-3 rounded-3xl flex items-center justify-between gap-3 select-none"
           >
             <div className="flex items-center gap-3 min-w-0">
               <span
@@ -677,7 +672,7 @@ function PlayerContent() {
           </div>
 
           {!isBacMode ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 select-none">
               {CHOICES.map((item) => {
                 const isSelected = selectedAnswer === item.key
                 const dimOther = Boolean(selectedAnswer) && !isSelected
@@ -707,10 +702,18 @@ function PlayerContent() {
               })}
             </div>
           ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+            <div
+              style={{ touchAction: 'auto' }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4"
+            >
               {bacPrompt && isBacRoundOpen ? (
-                <form onSubmit={handleSubmitBacWord} className="space-y-4">
-                  <div className="flex items-center gap-4">
+                <form
+                  key={`bac-round-${bacPrompt.roundIdx}-${bacPrompt.letter}`}
+                  onSubmit={handleSubmitBacWord}
+                  style={{ touchAction: 'auto' }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center gap-4 select-none">
                     <div className="w-16 h-16 rounded-2xl bg-indigo-600/30 border-2 border-indigo-400 flex items-center justify-center text-3xl font-black text-indigo-300 shrink-0">
                       {bacPrompt.letter}
                     </div>
@@ -725,7 +728,6 @@ function PlayerContent() {
                   </div>
 
                   <input
-                    ref={bacInputRef}
                     type="text"
                     enterKeyHint="send"
                     autoComplete="off"
@@ -734,9 +736,6 @@ function PlayerContent() {
                     spellCheck={false}
                     maxLength={50}
                     value={bacWordInput}
-                    onTouchStart={(e) => {
-                      e.currentTarget.focus()
-                    }}
                     onChange={(e) => setBacWordInput(e.target.value)}
                     placeholder={`Mot commençant par ${bacPrompt.letter}...`}
                     style={editableInputStyle}
@@ -757,7 +756,7 @@ function PlayerContent() {
                   </button>
                 </form>
               ) : (
-                <div className="py-8 text-center space-y-1">
+                <div className="py-8 text-center space-y-1 select-none">
                   <p className="text-xs uppercase tracking-widest text-indigo-400 font-bold">
                     Petit Bac
                   </p>
@@ -771,7 +770,7 @@ function PlayerContent() {
             </div>
           )}
 
-          <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center">
+          <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-2xl text-center select-none">
             {roomStatus === 'waiting' && !selectedAnswer && !bacSubmittedWord && (
               <p className="text-sm font-bold text-slate-300">
                 En attente du lancement sur la TV...
