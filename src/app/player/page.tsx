@@ -25,35 +25,39 @@ interface Player {
   score: number
   is_connected?: boolean | null
   client_id?: string | null
+  avatar?: string | null
 }
 
-interface PlayerColor {
-  bg: string
-  border: string
-  text: string
-  glow: string
-}
-
-const PLAYER_COLORS: PlayerColor[] = [
-  { bg: '#0284c7', border: '#7dd3fc', text: '#ffffff', glow: '0 0 18px rgba(2, 132, 199, 0.55)' },
-  { bg: '#059669', border: '#6ee7b7', text: '#ffffff', glow: '0 0 18px rgba(5, 150, 105, 0.55)' },
-  { bg: '#d97706', border: '#fcd34d', text: '#ffffff', glow: '0 0 18px rgba(217, 119, 6, 0.55)' },
-  { bg: '#7c3aed', border: '#c4b5fd', text: '#ffffff', glow: '0 0 18px rgba(124, 58, 237, 0.55)' },
-  { bg: '#e11d48', border: '#fda4af', text: '#ffffff', glow: '0 0 18px rgba(225, 29, 72, 0.55)' },
-  { bg: '#0d9488', border: '#5eead4', text: '#ffffff', glow: '0 0 18px rgba(13, 148, 136, 0.55)' },
-  { bg: '#c026d3', border: '#f0abfc', text: '#ffffff', glow: '0 0 18px rgba(192, 38, 211, 0.55)' },
-  { bg: '#ea580c', border: '#fdba74', text: '#ffffff', glow: '0 0 18px rgba(234, 88, 12, 0.55)' },
-  { bg: '#4f46e5', border: '#a5b4fc', text: '#ffffff', glow: '0 0 18px rgba(79, 70, 229, 0.55)' },
-  { bg: '#16a34a', border: '#86efac', text: '#ffffff', glow: '0 0 18px rgba(22, 163, 74, 0.55)' },
+const RANDOM_BADGE_COLORS = [
+  '#2563eb', // Bleu roi
+  '#059669', // Vert émeraude
+  '#d97706', // Ambre vif
+  '#7c3aed', // Violet intense
+  '#e11d48', // Rouge framboise
+  '#0891b2', // Cyan soutenu
+  '#c026d3', // Magenta
+  '#ea580c', // Orange brûlé
+  '#4f46e5', // Indigo
+  '#16a34a', // Vert pomme
+  '#db2777', // Rose vif
+  '#0d9488', // Turquoise foncé
 ]
 
-function getPlayerColor(player: Pick<Player, 'id' | 'pseudo' | 'client_id'>): PlayerColor {
+function pickRandomBadgeColor(): string {
+  const idx = Math.floor(Math.random() * RANDOM_BADGE_COLORS.length)
+  return RANDOM_BADGE_COLORS[idx]
+}
+
+function resolvePlayerColor(player: Pick<Player, 'avatar' | 'id' | 'pseudo' | 'client_id'>): string {
+  if (player.avatar && player.avatar.startsWith('#')) {
+    return player.avatar
+  }
   const seed = String(player.client_id ?? player.id ?? player.pseudo ?? '0')
   let hash = 0
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   }
-  return PLAYER_COLORS[hash % PLAYER_COLORS.length]
+  return RANDOM_BADGE_COLORS[hash % RANDOM_BADGE_COLORS.length]
 }
 
 function getOrCreateClientId(): string {
@@ -175,6 +179,7 @@ function PlayerContent() {
     }
 
     const clientId = getOrCreateClientId()
+    const assignedColor = pickRandomBadgeColor()
 
     const { data: createdPlayer, error: playerError } = await supabase
       .from('players')
@@ -185,6 +190,7 @@ function PlayerContent() {
           score: 0,
           is_connected: true,
           client_id: clientId || null,
+          avatar: assignedColor,
         },
       ])
       .select()
@@ -197,11 +203,11 @@ function PlayerContent() {
     }
 
     setRoom(foundRoom)
-    setPlayer(createdPlayer)
+    setPlayer({ ...createdPlayer, avatar: createdPlayer.avatar || assignedColor })
     setJoining(false)
   }
 
-  const activeColor = player ? getPlayerColor(player) : PLAYER_COLORS[0]
+  const badgeColor = player ? resolvePlayerColor(player) : RANDOM_BADGE_COLORS[0]
 
   return (
     <main className="relative h-screen w-full overflow-hidden bg-[#0e172a] text-white select-none font-sans antialiased flex flex-col justify-between px-5 py-6 sm:px-8 sm:py-8">
@@ -333,13 +339,8 @@ function PlayerContent() {
                 {room.game_type === 'petit_bac' ? 'Petit Bac' : 'Quiz'}
               </span>
               <span
-                style={{
-                  backgroundColor: activeColor.bg,
-                  borderColor: activeColor.border,
-                  color: activeColor.text,
-                  boxShadow: activeColor.glow,
-                }}
-                className="px-3.5 py-1 rounded-full text-xs font-semibold border"
+                style={{ backgroundColor: badgeColor }}
+                className="px-4 py-1.5 rounded-full text-xs font-semibold text-white border border-white/40 shadow-md"
               >
                 En cours
               </span>
@@ -348,12 +349,8 @@ function PlayerContent() {
             <div className="p-5 rounded-2xl bg-white/[0.07] border border-white/15 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <span
-                  style={{
-                    backgroundColor: activeColor.bg,
-                    borderColor: activeColor.border,
-                    boxShadow: activeColor.glow,
-                  }}
-                  className="w-5 h-5 rounded-full border-2 shrink-0"
+                  style={{ backgroundColor: badgeColor }}
+                  className="w-6 h-6 rounded-full border-2 border-white shrink-0 shadow-sm"
                 />
                 <div className="min-w-0">
                   <p className="text-xs uppercase tracking-[0.15em] text-slate-300">
@@ -385,13 +382,8 @@ function PlayerContent() {
           <div className="tvos-card w-full p-6 sm:p-8 rounded-[28px] bg-gradient-to-b from-white/[0.18] via-white/[0.09] to-slate-900/70 backdrop-blur-2xl border border-white/25 text-center space-y-6">
             <div className="space-y-2 flex flex-col items-center">
               <span
-                style={{
-                  backgroundColor: activeColor.bg,
-                  borderColor: activeColor.border,
-                  color: activeColor.text,
-                  boxShadow: activeColor.glow,
-                }}
-                className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] border"
+                style={{ backgroundColor: badgeColor }}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.16em] text-white border border-white/40 shadow-md"
               >
                 <span className="w-2.5 h-2.5 rounded-full bg-white" />
                 Connecté
