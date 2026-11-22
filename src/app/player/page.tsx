@@ -142,7 +142,23 @@ function isChoiceKey(value: string | null | undefined): value is ChoiceKey {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D';
 }
 
+function paletteFromAvatar(avatar: string | null | undefined): CardPalette | null {
+  if (!avatar) return null;
+  const clean = avatar.trim().toLowerCase();
+  const matched = CARD_PALETTES.find((p) => p.bg.toLowerCase() === clean);
+  return matched || null;
+}
+
 function getUniquePlayerPalette(player: PlayerRow, usedIndices: Set<number>): CardPalette {
+  const fromDb = paletteFromAvatar(player.avatar);
+  if (fromDb) {
+    const dbIdx = CARD_PALETTES.findIndex((p) => p.bg === fromDb.bg);
+    if (dbIdx >= 0) {
+      usedIndices.add(dbIdx);
+    }
+    return fromDb;
+  }
+
   const seed = `${player.client_id || player.id}-${player.pseudo || ''}`;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
@@ -341,10 +357,15 @@ export default function PlayerPage() {
           await supabase.from('players').delete().in('id', duplicateIds);
         }
 
+        const existingPalette =
+          paletteFromAvatar(latestRow.avatar) ||
+          getUniquePlayerPalette(latestRow, new Set<number>());
+
         const { data: updated } = await supabase
           .from('players')
           .update({
             pseudo: cleanPseudo,
+            avatar: existingPalette.bg,
             is_connected: true,
           })
           .eq('id', latestRow.id)
@@ -355,12 +376,25 @@ export default function PlayerPage() {
           setPlayer(updated as PlayerRow);
         }
       } else {
+        const tempRow: PlayerRow = {
+          id: 0,
+          pseudo: cleanPseudo,
+          avatar: null,
+          score: 0,
+          is_connected: true,
+          answer: null,
+          room_code: cleanCode,
+          client_id: activeClientId,
+        };
+        const assignedPalette = getUniquePlayerPalette(tempRow, new Set<number>());
+
         const { data: inserted, error: insertError } = await supabase
           .from('players')
           .insert({
             room_code: cleanCode,
             client_id: activeClientId,
             pseudo: cleanPseudo,
+            avatar: assignedPalette.bg,
             score: 0,
             is_connected: true,
             answer: null,
@@ -687,7 +721,6 @@ export default function PlayerPage() {
         </div>
       ) : (
         <>
-          {/* Pastille joueur aux couleurs exactes du classement TV (Rang + Nom + Points) */}
           <header
             style={{
               backgroundColor: playerPalette.bg,
@@ -720,7 +753,6 @@ export default function PlayerPage() {
             </span>
           </header>
 
-          {/* Infos question + chrono */}
           <div className="relative z-10 flex items-center justify-between px-1 py-1.5 shrink-0">
             <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">
               Question {currentQuestionIndex + 1}
@@ -731,7 +763,6 @@ export default function PlayerPage() {
             </span>
           </div>
 
-          {/* Grille compacte A / B / C / D */}
           <section className="relative z-10 grid grid-cols-2 gap-3 flex-1 min-h-0 max-h-[58dvh]">
             {CHOICES.map((item) => {
               const isSelected = activeChoice === item.key;
@@ -761,7 +792,6 @@ export default function PlayerPage() {
             })}
           </section>
 
-          {/* Bandeau statut en bas dans le thème vitré */}
           <footer className="relative z-10 mt-2 rounded-2xl bg-white/[0.1] backdrop-blur-xl border border-white/20 px-4 py-2.5 flex items-center justify-between shrink-0">
             <span className="text-sm font-semibold text-sky-100 truncate">
               {hasAnswered
