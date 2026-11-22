@@ -34,6 +34,14 @@ interface RoomRow {
   config: RoomConfig | string | null;
 }
 
+interface CardPalette {
+  bg: string;
+  border: string;
+  text: string;
+  badgeBg: string;
+  badgeText: string;
+}
+
 const CHOICES: ChoiceItem[] = [
   { key: 'A', bgClass: 'bg-red-600 active:bg-red-700' },
   { key: 'B', bgClass: 'bg-amber-400 text-slate-950 active:bg-amber-500' },
@@ -41,15 +49,63 @@ const CHOICES: ChoiceItem[] = [
   { key: 'D', bgClass: 'bg-emerald-600 active:bg-emerald-700' },
 ];
 
-const AVATAR_COLORS: string[] = [
-  '#10b981',
-  '#3b82f6',
-  '#f59e0b',
-  '#ec4899',
-  '#8b5cf6',
-  '#ef4444',
-  '#06b6d4',
-  '#f97316',
+const CARD_PALETTES: CardPalette[] = [
+  {
+    bg: '#2563eb',
+    border: '#93c5fd',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#059669',
+    border: '#6ee7b7',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#d97706',
+    border: '#fcd34d',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#db2777',
+    border: '#f9a8d4',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#7c3aed',
+    border: '#c4b5fd',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#ea580c',
+    border: '#fdba74',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#0891b2',
+    border: '#67e8f9',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
+  {
+    bg: '#e11d48',
+    border: '#fda4af',
+    text: '#ffffff',
+    badgeBg: 'rgba(15, 23, 42, 0.35)',
+    badgeText: '#ffffff',
+  },
 ];
 
 function generateClientId(): string {
@@ -86,17 +142,31 @@ function isChoiceKey(value: string | null | undefined): value is ChoiceKey {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D';
 }
 
+function getDeterministicPlayerPalette(
+  clientId: string,
+  pseudo: string,
+  fallbackId?: number
+): CardPalette {
+  const seed = `${clientId || fallbackId || ''}-${pseudo || ''}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const idx = hash % CARD_PALETTES.length;
+  return CARD_PALETTES[idx];
+}
+
 export default function PlayerPage() {
   const [roomCode, setRoomCode] = useState<string>('');
   const [clientId, setClientId] = useState<string>('');
   const [player, setPlayer] = useState<PlayerRow | null>(null);
   const [room, setRoom] = useState<RoomRow | null>(null);
+  const [allPlayers, setAllPlayers] = useState<PlayerRow[]>([]);
   const [selectedChoice, setSelectedChoice] = useState<ChoiceKey | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const [pseudoInput, setPseudoInput] = useState<string>('');
   const [roomInput, setRoomInput] = useState<string>('');
-  const [selectedColor, setSelectedColor] = useState<string>(AVATAR_COLORS[0]);
   const [isJoined, setIsJoined] = useState<boolean>(false);
   const [isJoining, setIsJoining] = useState<boolean>(false);
   const [joinError, setJoinError] = useState<string>('');
@@ -118,7 +188,7 @@ export default function PlayerPage() {
     clientIdRef.current = clientId;
   }, [clientId]);
 
-  // Verrouillage strict du zoom (gestes iOS Safari + double-tap + molette Ctrl)
+  // Verrouillage strict du zoom et du scroll sur mobile
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -186,9 +256,8 @@ export default function PlayerPage() {
     const urlClient = (params.get('client') || params.get('client_id') || '').trim();
 
     const storedCode = (window.localStorage.getItem('party_room_code') || '').trim().toUpperCase();
-    let storedClient = (window.localStorage.getItem('party_client_id') || '').trim();
+    const storedClient = (window.localStorage.getItem('party_client_id') || '').trim();
     const storedPseudo = (window.localStorage.getItem('party_player_pseudo') || '').trim();
-    const storedColor = (window.localStorage.getItem('party_player_color') || '').trim();
 
     const resolvedCode = urlCode || storedCode;
     const resolvedClient = urlClient || storedClient || generateClientId();
@@ -204,9 +273,6 @@ export default function PlayerPage() {
 
     if (storedPseudo) {
       setPseudoInput(storedPseudo);
-    }
-    if (storedColor) {
-      setSelectedColor(storedColor);
     }
   }, []);
 
@@ -238,16 +304,16 @@ export default function PlayerPage() {
 
     try {
       const activeClientId = clientId || generateClientId();
+      const palette = getDeterministicPlayerPalette(activeClientId, cleanPseudo);
+
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('party_client_id', activeClientId);
         window.localStorage.setItem('party_room_code', cleanCode);
         window.localStorage.setItem('party_player_pseudo', cleanPseudo);
-        window.localStorage.setItem('party_player_color', selectedColor);
       }
       setClientId(activeClientId);
       setRoomCode(cleanCode);
 
-      // Vérifier si ce téléphone (client_id) existe déjà dans ce salon
       const { data: existingRows } = await supabase
         .from('players')
         .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
@@ -267,7 +333,7 @@ export default function PlayerPage() {
           .from('players')
           .update({
             pseudo: cleanPseudo,
-            avatar: selectedColor,
+            avatar: palette.bg,
             is_connected: true,
           })
           .eq('id', latestRow.id)
@@ -284,7 +350,7 @@ export default function PlayerPage() {
             room_code: cleanCode,
             client_id: activeClientId,
             pseudo: cleanPseudo,
-            avatar: selectedColor,
+            avatar: palette.bg,
             score: 0,
             is_connected: true,
             answer: null,
@@ -366,22 +432,43 @@ export default function PlayerPage() {
       setRoom(roomData as RoomRow);
     }
 
-    const { data: playerData } = await supabase
+    const { data: roomPlayers } = await supabase
       .from('players')
       .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
       .eq('room_code', roomCode)
-      .eq('client_id', clientId)
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('id', { ascending: false });
 
-    if (playerData) {
-      const row = playerData as PlayerRow;
-      setPlayer(row);
-      if (isChoiceKey(row.answer)) {
-        setSelectedChoice(row.answer);
-      } else if (row.answer === null) {
-        setSelectedChoice(null);
+    if (Array.isArray(roomPlayers)) {
+      const sortedByNewest = (roomPlayers as PlayerRow[]).sort((a, b) => b.id - a.id);
+      const seenClients = new Set<string>();
+      const uniqueActive: PlayerRow[] = [];
+
+      for (const row of sortedByNewest) {
+        const cid = row.client_id?.trim() || '';
+        if (cid) {
+          if (seenClients.has(cid)) continue;
+          seenClients.add(cid);
+        }
+        if (row.is_connected !== false) {
+          uniqueActive.push(row);
+        }
+      }
+
+      uniqueActive.sort(
+        (a, b) =>
+          (typeof b.score === 'number' ? b.score : 0) -
+          (typeof a.score === 'number' ? a.score : 0)
+      );
+      setAllPlayers(uniqueActive);
+
+      const me = uniqueActive.find((p) => p.client_id?.trim() === clientId) || null;
+      if (me) {
+        setPlayer(me);
+        if (isChoiceKey(me.answer)) {
+          setSelectedChoice(me.answer);
+        } else if (me.answer === null) {
+          setSelectedChoice(null);
+        }
       }
     }
   }, [roomCode, clientId]);
@@ -475,15 +562,34 @@ export default function PlayerPage() {
   };
 
   const playerName = player?.pseudo?.trim() || pseudoInput.trim() || 'Joueur';
-  const playerColor = player?.avatar?.trim() || selectedColor;
+  const playerPalette = useMemo(() => {
+    const base = getDeterministicPlayerPalette(
+      player?.client_id || clientId,
+      playerName,
+      player?.id
+    );
+    if (player?.avatar && player.avatar.startsWith('#')) {
+      const matched = CARD_PALETTES.find(
+        (p) => p.bg.toLowerCase() === player.avatar!.toLowerCase()
+      );
+      if (matched) return matched;
+    }
+    return base;
+  }, [player?.client_id, player?.id, player?.avatar, clientId, playerName]);
+
   const score = typeof player?.score === 'number' ? player.score : 0;
+  const playerRank = useMemo(() => {
+    const idx = allPlayers.findIndex((p) => p.client_id?.trim() === clientId);
+    return idx >= 0 ? idx + 1 : 1;
+  }, [allPlayers, clientId]);
+
   const activeChoice: ChoiceKey | null =
     selectedChoice ?? (isChoiceKey(player?.answer) ? player.answer : null);
   const hasAnswered =
     activeChoice !== null || Boolean(player?.answer && player.answer.trim().length > 0);
 
   return (
-    <main className="fixed inset-0 h-[100dvh] w-full overflow-hidden overscroll-none bg-slate-950 text-white flex flex-col justify-between px-3 py-2.5 select-none touch-none">
+    <main className="fixed inset-0 h-[100dvh] w-full overflow-hidden overscroll-none bg-[#0e172a] text-white flex flex-col justify-between px-3.5 py-3 select-none touch-none antialiased">
       <style>{`
         html, body {
           position: fixed;
@@ -494,27 +600,38 @@ export default function PlayerPage() {
           overscroll-behavior: none !important;
           touch-action: none !important;
           -webkit-text-size-adjust: 100%;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
         }
       `}</style>
 
+      {/* Halos lumineux identiques à l'écran TV */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_85%_60%_at_50%_0%,rgba(59,130,246,0.34),rgba(14,23,42,0))]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(56,189,248,0.16),transparent_50%)]"
+      />
+
       {!isJoined ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-3">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-2">
           <form
             onSubmit={(e) => void handleJoinRoom(e)}
-            className="w-full max-w-sm rounded-3xl bg-slate-900 border border-white/15 p-5 flex flex-col gap-4 shadow-2xl"
+            className="w-full max-w-sm rounded-[28px] bg-gradient-to-b from-white/[0.16] via-white/[0.08] to-slate-900/65 backdrop-blur-2xl border border-white/25 p-6 flex flex-col gap-5 shadow-2xl"
           >
             <div className="text-center">
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-sky-400">
-                Rejoindre la partie
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
+                Quiz • Salon {roomCode || 'Partie'}
               </span>
-              <h1 className="text-2xl font-extrabold tracking-tight text-white mt-1">
-                Ton profil joueur
+              <h1 className="text-2xl font-bold tracking-tight text-white mt-1.5">
+                Entre ton pseudo
               </h1>
             </div>
 
             {!roomCode && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">
                   Code du salon
                 </label>
                 <input
@@ -524,62 +641,28 @@ export default function PlayerPage() {
                   placeholder="Ex: ABC123"
                   maxLength={10}
                   autoCapitalize="characters"
-                  className="w-full rounded-2xl bg-slate-950 border border-white/15 px-4 py-3 text-base font-bold uppercase tracking-widest text-white outline-none focus:border-sky-400 touch-auto"
+                  className="w-full rounded-2xl bg-white/[0.1] border border-white/20 px-4 py-3 text-base font-bold uppercase tracking-widest text-white placeholder:text-slate-400 outline-none focus:border-sky-400 touch-auto"
                 />
               </div>
             )}
 
-            {roomCode && (
-              <div className="rounded-2xl bg-slate-950/80 border border-white/10 px-4 py-2.5 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Salon
-                </span>
-                <span className="text-sm font-black tracking-widest text-sky-300">
-                  {roomCode}
-                </span>
-              </div>
-            )}
-
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">
                 Pseudo
               </label>
               <input
                 type="text"
                 value={pseudoInput}
                 onChange={(e) => setPseudoInput(e.target.value)}
-                placeholder="Entre ton pseudo"
+                placeholder="Ton prénom ou pseudo"
                 maxLength={18}
                 autoComplete="off"
-                className="w-full rounded-2xl bg-slate-950 border border-white/15 px-4 py-3 text-base font-bold text-white outline-none focus:border-sky-400 touch-auto"
+                className="w-full rounded-2xl bg-white/[0.1] border border-white/20 px-4 py-3.5 text-base font-bold text-white placeholder:text-slate-400 outline-none focus:border-sky-400 touch-auto"
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Couleur
-              </span>
-              <div className="grid grid-cols-8 gap-2">
-                {AVATAR_COLORS.map((color) => {
-                  const isCurrent = selectedColor === color;
-                  return (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      style={{ backgroundColor: color }}
-                      className={`h-8 w-8 rounded-full transition-transform ${
-                        isCurrent ? 'scale-110 ring-2 ring-white' : 'opacity-75'
-                      }`}
-                      aria-label={`Couleur ${color}`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
             {joinError && (
-              <p className="text-xs font-semibold text-red-400 text-center">
+              <p className="text-xs font-semibold text-red-300 text-center">
                 {joinError}
               </p>
             )}
@@ -587,46 +670,54 @@ export default function PlayerPage() {
             <button
               type="submit"
               disabled={isJoining}
-              className="mt-1 w-full rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 py-3.5 text-base font-extrabold text-slate-950 transition active:scale-[0.99] disabled:opacity-50"
+              className="w-full rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 py-3.5 text-base font-bold text-slate-950 shadow-lg transition hover:brightness-105 active:scale-[0.99] disabled:opacity-50"
             >
-              {isJoining ? 'Connexion...' : 'Entrer dans le salon'}
+              {isJoining ? 'Connexion...' : 'Rejoindre le salon'}
             </button>
           </form>
         </div>
       ) : (
         <>
-          {/* Bandeau supérieur : Pastille joueur + État + Score */}
-          <header className="flex items-center justify-between gap-2 rounded-2xl bg-slate-900/95 border border-white/10 px-3 py-2 shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
+          {/* Carte joueur aux couleurs exactes du classement TV (Rang + Nom + Points) */}
+          <header
+            style={{
+              backgroundColor: playerPalette.bg,
+              borderColor: playerPalette.border,
+              color: playerPalette.text,
+            }}
+            className="relative z-10 flex items-center justify-between gap-2.5 rounded-2xl border-2 px-3.5 py-2.5 shadow-lg shrink-0"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
               <span
-                className="h-4 w-4 rounded-full shrink-0 ring-2 ring-white/40"
-                style={{ backgroundColor: playerColor }}
-                aria-hidden="true"
-              />
-              <span className="font-bold text-base truncate">{playerName}</span>
-              <span
-                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${
-                  hasAnswered
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
-                    : 'bg-white/10 text-slate-300'
-                }`}
+                style={{
+                  backgroundColor: playerPalette.badgeBg,
+                  color: playerPalette.badgeText,
+                }}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-extrabold shrink-0"
               >
-                {hasAnswered
-                  ? activeChoice
-                    ? `Répondu (${activeChoice})`
-                    : 'Répondu'
-                  : 'En attente'}
+                {playerRank}
               </span>
+              <span className="font-bold text-lg truncate">{playerName}</span>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="bg-emerald-600 text-white font-extrabold text-sm px-3 py-1 rounded-xl">
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                style={{
+                  backgroundColor: playerPalette.badgeBg,
+                  color: playerPalette.badgeText,
+                }}
+                className="rounded-xl px-3 py-1 text-base font-extrabold shrink-0"
+              >
                 {score} pts
               </span>
               <button
                 type="button"
                 onClick={() => void handleLeaveRoom()}
-                className="rounded-xl bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-300 active:bg-white/20"
+                style={{
+                  backgroundColor: playerPalette.badgeBg,
+                  color: playerPalette.badgeText,
+                }}
+                className="rounded-xl px-2.5 py-1.5 text-xs font-semibold active:opacity-80"
                 title="Changer de pseudo ou quitter"
               >
                 Quitter
@@ -635,18 +726,18 @@ export default function PlayerPage() {
           </header>
 
           {/* Infos question + chrono */}
-          <div className="flex items-center justify-between px-1 py-1 shrink-0">
-            <span className="text-xs font-bold tracking-widest uppercase text-slate-400">
+          <div className="relative z-10 flex items-center justify-between px-1 py-1.5 shrink-0">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">
               Question {currentQuestionIndex + 1}
-              {roomCode ? ` • ${roomCode}` : ''}
+              {roomCode ? ` • Salon ${roomCode}` : ''}
             </span>
-            <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-slate-800 text-slate-100">
+            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-white/[0.12] border border-white/20 text-white tabular-nums">
               {timeLeft}s
             </span>
           </div>
 
           {/* Grille compacte A / B / C / D */}
-          <section className="grid grid-cols-2 gap-2.5 flex-1 min-h-0 max-h-[58dvh]">
+          <section className="relative z-10 grid grid-cols-2 gap-3 flex-1 min-h-0 max-h-[58dvh]">
             {CHOICES.map((item) => {
               const isSelected = activeChoice === item.key;
 
@@ -656,17 +747,17 @@ export default function PlayerPage() {
                   type="button"
                   disabled={hasAnswered || isSubmitting || timeLeft <= 0}
                   onClick={() => void handleSelectChoice(item.key)}
-                  className={`rounded-2xl border-2 flex flex-col items-center justify-center font-black text-3xl sm:text-4xl transition-transform ${
+                  className={`rounded-[24px] border-2 flex flex-col items-center justify-center font-black text-3xl sm:text-4xl transition-transform ${
                     item.bgClass
                   } ${
                     isSelected
-                      ? 'border-white scale-[0.98] ring-4 ring-white/40'
+                      ? 'border-white scale-[0.98] ring-4 ring-white/45'
                       : 'border-white/25'
                   } disabled:opacity-80`}
                 >
                   <span>{item.key}</span>
                   {isSelected && (
-                    <span className="mt-1 text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-black/35 text-white">
+                    <span className="mt-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-black/35 text-white">
                       Choisi
                     </span>
                   )}
@@ -675,20 +766,22 @@ export default function PlayerPage() {
             })}
           </section>
 
-          {/* Pastille joueur bien visible en bas */}
-          <footer className="mt-2 rounded-2xl bg-slate-900 border border-white/10 px-3.5 py-2 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span
-                className="h-4 w-4 rounded-full shrink-0 ring-2 ring-white/30"
-                style={{ backgroundColor: playerColor }}
-                aria-hidden="true"
-              />
-              <span className="text-sm font-semibold text-slate-200 truncate">
-                {hasAnswered
-                  ? `${playerName} — Réponse ${activeChoice ?? player?.answer} envoyée`
-                  : `${playerName} — Touchez une case`}
-              </span>
-            </div>
+          {/* Bandeau statut en bas dans le thème vitré */}
+          <footer className="relative z-10 mt-2 rounded-2xl bg-white/[0.1] backdrop-blur-xl border border-white/20 px-4 py-2.5 flex items-center justify-between shrink-0">
+            <span className="text-sm font-semibold text-sky-100 truncate">
+              {hasAnswered
+                ? `Réponse ${activeChoice ?? player?.answer} envoyée`
+                : 'Touchez une case pour répondre'}
+            </span>
+            <span
+              className={`text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${
+                hasAnswered
+                  ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
+                  : 'bg-white/[0.12] text-slate-200'
+              }`}
+            >
+              {hasAnswered ? 'Validé' : 'En attente'}
+            </span>
           </footer>
         </>
       )}
