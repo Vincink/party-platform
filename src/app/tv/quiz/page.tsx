@@ -158,7 +158,13 @@ function normalizeQuestionOrder(rawOrder: unknown, bankLength: number): number[]
   const seen = new Set<number>();
   const cleaned: number[] = [];
   for (const item of rawOrder) {
-    if (typeof item === 'number' && Number.isInteger(item) && item >= 0 && item < bankLength && !seen.has(item)) {
+    if (
+      typeof item === 'number' &&
+      Number.isInteger(item) &&
+      item >= 0 &&
+      item < bankLength &&
+      !seen.has(item)
+    ) {
       seen.add(item);
       cleaned.push(item);
     }
@@ -242,7 +248,13 @@ export default function TvQuizPage() {
   );
   const [questionIndex, setQuestionIndex] = useState<number>(0);
   const [timeLeft, setTimeLeft] = useState<number>(QUIZ_DURATION);
-  const scoredQuestionKeyRef = useRef<string>('');
+
+  const playersRef = useRef<PlayerRow[]>([]);
+  const scoredKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -322,7 +334,6 @@ export default function TvQuizPage() {
         const normalizedIdx = cfg.question_index % syncedOrder.length;
         setQuestionIndex((prev) => {
           if (prev !== normalizedIdx) {
-            scoredQuestionKeyRef.current = '';
             setTimeLeft(QUIZ_DURATION);
           }
           return normalizedIdx;
@@ -386,7 +397,7 @@ export default function TvQuizPage() {
 
     const pollId = window.setInterval(() => {
       void refreshQuizData();
-    }, 1500);
+    }, 2500);
 
     return () => {
       window.clearInterval(pollId);
@@ -413,23 +424,30 @@ export default function TvQuizPage() {
 
   useEffect(() => {
     if (!isTimeOver) return;
-    const scoreKey = `${activeRoomCode}-${questionIndex}-${bankIndex}`;
-    if (scoredQuestionKeyRef.current === scoreKey) return;
-    scoredQuestionKeyRef.current = scoreKey;
 
-    const winners = players.filter(
+    const scoreKey = `${activeRoomCode}:${questionIndex}:${bankIndex}`;
+    if (scoredKeysRef.current.has(scoreKey)) return;
+    scoredKeysRef.current.add(scoreKey);
+
+    const winners = playersRef.current.filter(
       (p) => normalizeAnswerLetter(p.answer, currentQuestion) === currentQuestion.correct
     );
     if (winners.length === 0) return;
 
+    const winnerIds = new Set(winners.map((w) => w.id));
+
     setPlayers((prev) =>
       prev
         .map((p) =>
-          normalizeAnswerLetter(p.answer, currentQuestion) === currentQuestion.correct
+          winnerIds.has(p.id)
             ? { ...p, score: (typeof p.score === 'number' ? p.score : 0) + 10 }
             : p
         )
-        .sort((a, b) => (typeof b.score === 'number' ? b.score : 0) - (typeof a.score === 'number' ? a.score : 0))
+        .sort(
+          (a, b) =>
+            (typeof b.score === 'number' ? b.score : 0) -
+            (typeof a.score === 'number' ? a.score : 0)
+        )
     );
 
     void Promise.all(
@@ -439,16 +457,13 @@ export default function TvQuizPage() {
           .update({ score: (typeof w.score === 'number' ? w.score : 0) + 10 })
           .eq('id', w.id)
       )
-    ).then(() => {
-      void refreshQuizData();
-    });
-  }, [isTimeOver, activeRoomCode, questionIndex, bankIndex, players, currentQuestion, refreshQuizData]);
+    );
+  }, [isTimeOver, activeRoomCode, questionIndex, bankIndex, currentQuestion]);
 
   const syncNextQuestion = async () => {
     if (timeLeft > 0) return;
 
     const nextIdx = (questionIndex + 1) % questionOrder.length;
-    scoredQuestionKeyRef.current = '';
     setQuestionIndex(nextIdx);
     setTimeLeft(QUIZ_DURATION);
 
@@ -461,8 +476,8 @@ export default function TvQuizPage() {
       time_left: QUIZ_DURATION,
     };
 
-    if (room?.room_code || roomCode) {
-      const targetCode = room?.room_code || roomCode;
+    const targetCode = room?.room_code || roomCode;
+    if (targetCode) {
       await supabase
         .from('players')
         .update({ answer: null })
