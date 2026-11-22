@@ -209,8 +209,54 @@ function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   return raw;
 }
 
+function deduplicateByDevice(rows: PlayerRow[]): {
+  active: PlayerRow[];
+  duplicateIdsToRemove: number[];
+} {
+  // Trier du plus récent (id le plus grand) au plus ancien pour conserver la session active de chaque téléphone
+  const sortedByNewest = [...rows].sort((a, b) => b.id - a.id);
+  const seenClientIds = new Set<string>();
+  const seenPseudoKeys = new Set<string>();
+  const duplicateIdsToRemove: number[] = [];
+  const uniqueConnected: PlayerRow[] = [];
+
+  for (const row of sortedByNewest) {
+    const clientId = row.client_id?.trim() || '';
+    const pseudoKey = (row.pseudo?.trim() || '').toLowerCase();
+
+    if (clientId) {
+      if (seenClientIds.has(clientId)) {
+        duplicateIdsToRemove.push(row.id);
+        continue;
+      }
+      seenClientIds.add(clientId);
+    } else if (pseudoKey) {
+      if (seenPseudoKeys.has(pseudoKey)) {
+        duplicateIdsToRemove.push(row.id);
+        continue;
+      }
+      seenPseudoKeys.add(pseudoKey);
+    }
+
+    if (row.is_connected === true) {
+      uniqueConnected.push(row);
+    }
+  }
+
+  uniqueConnected.sort(
+    (a, b) =>
+      (typeof b.score === 'number' ? b.score : 0) -
+      (typeof a.score === 'number' ? a.score : 0)
+  );
+
+  return {
+    active: uniqueConnected,
+    duplicateIdsToRemove,
+  };
+}
+
 function getUniquePlayerPalette(player: PlayerRow, usedIndices: Set<number>): CardPalette {
-  const seed = `${player.id}-${player.client_id || ''}-${player.pseudo || ''}`;
+  const seed = `${player.client_id || player.id}-${player.pseudo || ''}`;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
@@ -243,6 +289,7 @@ export default function TvQuizPage() {
   const [roomCode, setRoomCode] = useState<string>('');
   const [room, setRoom] = useState<RoomRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [presentClientIds, setPresentClientIds] = useState<Set<string> | null>(null);
   const [questionOrder, setQuestionOrder] = useState<number[]>(() =>
     createShuffledOrder(QUESTION_BANK.length)
   );
@@ -344,13 +391,21 @@ export default function TvQuizPage() {
         .from('players')
         .select('id, pseudo, avatar, score, is_connected, answer, room_code, client_id')
         .eq('room_code', targetRoom.room_code)
-        .order('score', { ascending: false });
+        .order('id', { ascending: false });
 
       if (Array.isArray(roomPlayers)) {
-        const activePlayers = (roomPlayers as PlayerRow[]).filter(
-          (p) => p.is_connected !== false
+        const { active, duplicateIdsToRemove } = deduplicateByDevice(
+          roomPlayers as PlayerRow[]
         );
-        setPlayers(activePlayers);
+
+        if (duplicateIdsToRemove.length > 0) {
+          void supabase
+            .from('players')
+            .delete()
+            .in('id', duplicateIdsToRemove);
+        }
+
+        setPlayers(active);
       }
     }
   }, [roomCode]);
@@ -405,6 +460,39 @@ export default function TvQuizPage() {
     };
   }, [room?.room_code, roomCode, refreshQuizData]);
 
+  // Suivi optionnel de présence temps réel sur le salon si la page joueur utilise Presence
+  useEffect(() => {
+    const targetCode = room?.room_code || roomCode;
+    if (!targetCode) return;
+
+    const presenceChannel = supabase.channel(`room-presence-${targetCode}`);
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState<Record<string, unknown>>();
+        const ids = new Set<string>();
+        Object.entries(state).forEach(([key, entries]) => {
+          if (key && key !== 'tv-host') {
+            ids.add(key);
+          }
+          if (Array.isArray(entries)) {
+            entries.forEach((entry) => {
+              const cid =
+                typeof entry.client_id === 'string' ? entry.client_id.trim() : '';
+              if (cid) ids.add(cid);
+            });
+          }
+        });
+        setPresentClientIds(ids.size > 0 ? ids : null);
+      })
+      .subscribe();
+
+    return () => {
+      setPresentClientIds(null);
+      void supabase.removeChannel(presenceChannel);
+    };
+  }, [room?.room_code, roomCode]);
+
   useEffect(() => {
     if (timeLeft <= 0) return;
 
@@ -416,6 +504,13 @@ export default function TvQuizPage() {
       window.clearInterval(timerId);
     };
   }, [questionIndex, timeLeft]);
+
+  const visiblePlayers =
+    presentClientIds && presentClientIds.size > 0
+      ? players.filter(
+          (p) => !p.client_id || presentClientIds.has(p.client_id.trim())
+        )
+      : players;
 
   const activeRoomCode = room?.room_code || roomCode || 'SALON';
   const bankIndex = questionOrder[questionIndex] ?? 0;
@@ -657,19 +752,19 @@ export default function TvQuizPage() {
               </h2>
             </div>
             <span className="inline-flex items-center justify-center min-w-8 h-8 px-2.5 rounded-full text-xs font-semibold bg-white/[0.14] border border-white/20 text-white">
-              {players.length}
+              {visiblePlayers.length}
             </span>
           </div>
 
-          {players.length === 0 ? (
+          {visiblePlayers.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-center px-4">
               <p className="text-sm text-slate-300">
-                Aucun joueur dans le salon.
+                Aucun joueur connecté dans le salon.
               </p>
             </div>
           ) : (
             <ul className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
-              {players.map((p, index) => {
+              {visiblePlayers.map((p, index) => {
                 const name = p.pseudo?.trim() || 'Joueur';
                 const palette = getUniquePlayerPalette(p, usedPaletteIndices);
                 const score = typeof p.score === 'number' ? p.score : 0;
@@ -677,7 +772,7 @@ export default function TvQuizPage() {
 
                 return (
                   <li
-                    key={p.id}
+                    key={p.client_id || p.id}
                     style={{
                       backgroundColor: palette.bg,
                       borderColor: palette.border,
