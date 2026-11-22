@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { QUESTIONS, type QuizQuestion } from '@/data/questions';
@@ -13,6 +13,7 @@ const OPTION_LETTERS: OptionLetter[] = ['A', 'B', 'C', 'D'];
 interface RoomConfig {
   game_mode?: GameMode;
   question_index?: number;
+  question_order?: number[];
   time_left?: number;
 }
 
@@ -139,6 +140,57 @@ const FALLBACK_QUESTION: QuizQuestion = {
 const QUESTION_BANK: QuizQuestion[] = QUESTIONS.length > 0 ? QUESTIONS : [FALLBACK_QUESTION];
 const QUIZ_DURATION = 12;
 
+function createShuffledOrder(length: number): number[] {
+  const indices = Array.from({ length }, (_, idx) => idx);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = indices[i];
+    indices[i] = indices[j];
+    indices[j] = tmp;
+  }
+  return indices;
+}
+
+function normalizeQuestionOrder(rawOrder: unknown, bankLength: number): number[] {
+  if (!Array.isArray(rawOrder) || rawOrder.length === 0) {
+    return createShuffledOrder(bankLength);
+  }
+  const seen = new Set<number>();
+  const cleaned: number[] = [];
+  for (const item of rawOrder) {
+    if (typeof item === 'number' && Number.isInteger(item) && item >= 0 && item < bankLength && !seen.has(item)) {
+      seen.add(item);
+      cleaned.push(item);
+    }
+  }
+  for (let i = 0; i < bankLength; i++) {
+    if (!seen.has(i)) {
+      cleaned.push(i);
+    }
+  }
+  return cleaned.length > 0 ? cleaned : createShuffledOrder(bankLength);
+}
+
+function normalizeAnswerLetter(rawAnswer: string | null, question: QuizQuestion): OptionLetter | null {
+  if (!rawAnswer) return null;
+  const trimmed = rawAnswer.trim().toUpperCase();
+  if (trimmed === 'A' || trimmed === 'B' || trimmed === 'C' || trimmed === 'D') {
+    return trimmed;
+  }
+  if (trimmed === '0' || trimmed === '1') return 'A';
+  if (trimmed === '2') return 'B';
+  if (trimmed === '3') return 'C';
+  if (trimmed === '4') return 'D';
+
+  const lower = rawAnswer.trim().toLowerCase();
+  for (const letter of OPTION_LETTERS) {
+    if (question.options[letter].trim().toLowerCase() === lower) {
+      return letter;
+    }
+  }
+  return null;
+}
+
 function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   if (!raw) return {};
   if (typeof raw === 'string') {
@@ -185,8 +237,12 @@ export default function TvQuizPage() {
   const [roomCode, setRoomCode] = useState<string>('');
   const [room, setRoom] = useState<RoomRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [questionOrder, setQuestionOrder] = useState<number[]>(() =>
+    createShuffledOrder(QUESTION_BANK.length)
+  );
   const [questionIndex, setQuestionIndex] = useState<number>(0);
   const [timeLeft, setTimeLeft] = useState<number>(QUIZ_DURATION);
+  const scoredQuestionKeyRef = useRef<string>('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -201,29 +257,33 @@ export default function TvQuizPage() {
       .trim()
       .toUpperCase();
 
-    const storedCode = (
-      window.localStorage.getItem('party_tv_room_code') ||
-      window.localStorage.getItem('party_room_code') ||
-      ''
-    )
-      .trim()
-      .toUpperCase();
-
-    const active = urlCode || storedCode;
-    if (active) {
-      window.localStorage.setItem('party_tv_room_code', active);
-      setRoomCode(active);
+    if (urlCode) {
+      window.localStorage.setItem('party_tv_room_code', urlCode);
+      setRoomCode(urlCode);
     }
   }, []);
 
   const refreshQuizData = useCallback(async () => {
     let targetRoom: RoomRow | null = null;
+    const urlCode =
+      typeof window !== 'undefined'
+        ? (
+            new URLSearchParams(window.location.search).get('code') ||
+            new URLSearchParams(window.location.search).get('room') ||
+            new URLSearchParams(window.location.search).get('room_code') ||
+            ''
+          )
+            .trim()
+            .toUpperCase()
+        : '';
 
-    if (roomCode) {
+    const lookupCode = urlCode || roomCode;
+
+    if (lookupCode) {
       const { data: byCode } = await supabase
         .from('rooms')
         .select('id, room_code, status, config')
-        .eq('room_code', roomCode)
+        .eq('room_code', lookupCode)
         .order('id', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -233,7 +293,7 @@ export default function TvQuizPage() {
       }
     }
 
-    if (!targetRoom) {
+    if (!targetRoom && !urlCode) {
       const { data: latest } = await supabase
         .from('rooms')
         .select('id, room_code, status, config')
@@ -243,8 +303,11 @@ export default function TvQuizPage() {
 
       if (latest) {
         targetRoom = latest as RoomRow;
-        if (!roomCode && targetRoom.room_code) {
+        if (targetRoom.room_code && targetRoom.room_code !== roomCode) {
           setRoomCode(targetRoom.room_code);
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('party_tv_room_code', targetRoom.room_code);
+          }
         }
       }
     }
@@ -252,10 +315,14 @@ export default function TvQuizPage() {
     if (targetRoom) {
       setRoom(targetRoom);
       const cfg = parseConfig(targetRoom.config);
+      const syncedOrder = normalizeQuestionOrder(cfg.question_order, QUESTION_BANK.length);
+      setQuestionOrder(syncedOrder);
+
       if (typeof cfg.question_index === 'number' && cfg.question_index >= 0) {
-        const normalizedIdx = cfg.question_index % QUESTION_BANK.length;
+        const normalizedIdx = cfg.question_index % syncedOrder.length;
         setQuestionIndex((prev) => {
           if (prev !== normalizedIdx) {
+            scoredQuestionKeyRef.current = '';
             setTimeLeft(QUIZ_DURATION);
           }
           return normalizedIdx;
@@ -269,7 +336,10 @@ export default function TvQuizPage() {
         .order('score', { ascending: false });
 
       if (Array.isArray(roomPlayers)) {
-        setPlayers(roomPlayers as PlayerRow[]);
+        const activePlayers = (roomPlayers as PlayerRow[]).filter(
+          (p) => p.is_connected !== false
+        );
+        setPlayers(activePlayers);
       }
     }
   }, [roomCode]);
@@ -277,19 +347,20 @@ export default function TvQuizPage() {
   useEffect(() => {
     void refreshQuizData();
 
-    const channel = supabase.channel(`tv-quiz-${roomCode || 'latest'}`);
+    const activeFilterCode = room?.room_code || roomCode;
+    const channel = supabase.channel(`tv-quiz-${activeFilterCode || 'latest'}`);
 
-    if (roomCode) {
+    if (activeFilterCode) {
       channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${roomCode}` },
+        { event: '*', schema: 'public', table: 'players', filter: `room_code=eq.${activeFilterCode}` },
         () => {
           void refreshQuizData();
         }
       );
       channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` },
+        { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${activeFilterCode}` },
         () => {
           void refreshQuizData();
         }
@@ -315,13 +386,13 @@ export default function TvQuizPage() {
 
     const pollId = window.setInterval(() => {
       void refreshQuizData();
-    }, 2500);
+    }, 1500);
 
     return () => {
       window.clearInterval(pollId);
       void supabase.removeChannel(channel);
     };
-  }, [roomCode, refreshQuizData]);
+  }, [room?.room_code, roomCode, refreshQuizData]);
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -335,46 +406,87 @@ export default function TvQuizPage() {
     };
   }, [questionIndex, timeLeft]);
 
-  const syncQuestionIndex = async (nextIdx: number) => {
+  const activeRoomCode = room?.room_code || roomCode || 'SALON';
+  const bankIndex = questionOrder[questionIndex] ?? 0;
+  const currentQuestion = QUESTION_BANK[bankIndex] || QUESTION_BANK[0];
+  const isTimeOver = timeLeft <= 0;
+
+  useEffect(() => {
+    if (!isTimeOver) return;
+    const scoreKey = `${activeRoomCode}-${questionIndex}-${bankIndex}`;
+    if (scoredQuestionKeyRef.current === scoreKey) return;
+    scoredQuestionKeyRef.current = scoreKey;
+
+    const winners = players.filter(
+      (p) => normalizeAnswerLetter(p.answer, currentQuestion) === currentQuestion.correct
+    );
+    if (winners.length === 0) return;
+
+    setPlayers((prev) =>
+      prev
+        .map((p) =>
+          normalizeAnswerLetter(p.answer, currentQuestion) === currentQuestion.correct
+            ? { ...p, score: (typeof p.score === 'number' ? p.score : 0) + 10 }
+            : p
+        )
+        .sort((a, b) => (typeof b.score === 'number' ? b.score : 0) - (typeof a.score === 'number' ? a.score : 0))
+    );
+
+    void Promise.all(
+      winners.map((w) =>
+        supabase
+          .from('players')
+          .update({ score: (typeof w.score === 'number' ? w.score : 0) + 10 })
+          .eq('id', w.id)
+      )
+    ).then(() => {
+      void refreshQuizData();
+    });
+  }, [isTimeOver, activeRoomCode, questionIndex, bankIndex, players, currentQuestion, refreshQuizData]);
+
+  const syncNextQuestion = async () => {
     if (timeLeft > 0) return;
 
-    const normalized =
-      ((nextIdx % QUESTION_BANK.length) + QUESTION_BANK.length) % QUESTION_BANK.length;
-    setQuestionIndex(normalized);
+    const nextIdx = (questionIndex + 1) % questionOrder.length;
+    scoredQuestionKeyRef.current = '';
+    setQuestionIndex(nextIdx);
     setTimeLeft(QUIZ_DURATION);
-
-    const activeCode = room?.room_code || roomCode;
-    if (!activeCode) return;
 
     const currentCfg = parseConfig(room?.config);
     const nextCfg: RoomConfig = {
       ...currentCfg,
       game_mode: 'quiz',
-      question_index: normalized,
+      question_order: questionOrder,
+      question_index: nextIdx,
       time_left: QUIZ_DURATION,
     };
 
-    await supabase
-      .from('rooms')
-      .update({ config: nextCfg })
-      .eq('room_code', activeCode);
+    if (room?.room_code || roomCode) {
+      const targetCode = room?.room_code || roomCode;
+      await supabase
+        .from('players')
+        .update({ answer: null })
+        .eq('room_code', targetCode);
+
+      await supabase
+        .from('rooms')
+        .update({ config: nextCfg })
+        .eq('room_code', targetCode);
+    }
   };
 
   const handleBackToLobby = async () => {
-    const activeCode = room?.room_code || roomCode;
-    if (activeCode) {
+    const targetCode = room?.room_code || roomCode;
+    if (targetCode) {
       await supabase
         .from('rooms')
         .update({ status: 'lobby' })
-        .eq('room_code', activeCode);
+        .eq('room_code', targetCode);
     }
-    const query = activeCode ? `?code=${encodeURIComponent(activeCode)}` : '';
+    const query = targetCode ? `?code=${encodeURIComponent(targetCode)}` : '';
     router.push(`/tv${query}`);
   };
 
-  const activeRoomCode = room?.room_code || roomCode || 'SALON';
-  const currentQuestion = QUESTION_BANK[questionIndex] || QUESTION_BANK[0];
-  const isTimeOver = timeLeft <= 0;
   const isDangerBlink = timeLeft > 0 && timeLeft <= 5;
   const usedPaletteIndices = new Set<number>();
 
@@ -436,7 +548,7 @@ export default function TvQuizPage() {
         </div>
 
         <span className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em] bg-white/[0.12] border border-white/20 text-sky-200 backdrop-blur-xl">
-          Question {questionIndex + 1} / {QUESTION_BANK.length}
+          Question {questionIndex + 1} / {questionOrder.length}
         </span>
       </header>
 
@@ -509,7 +621,7 @@ export default function TvQuizPage() {
               <button
                 type="button"
                 disabled={timeLeft > 0}
-                onClick={() => void syncQuestionIndex(questionIndex + 1)}
+                onClick={() => void syncNextQuestion()}
                 className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-400 text-slate-950 text-base font-bold cursor-pointer transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Question suivante
@@ -546,6 +658,7 @@ export default function TvQuizPage() {
                 const name = p.pseudo?.trim() || 'Joueur';
                 const palette = getUniquePlayerPalette(p, usedPaletteIndices);
                 const score = typeof p.score === 'number' ? p.score : 0;
+                const playerAnswer = normalizeAnswerLetter(p.answer, currentQuestion);
 
                 return (
                   <li
@@ -575,15 +688,22 @@ export default function TvQuizPage() {
                       </p>
                     </div>
 
-                    <span
-                      style={{
-                        backgroundColor: palette.badgeBg,
-                        color: palette.badgeText,
-                      }}
-                      className="rounded-xl px-4 py-1.5 text-xl sm:text-2xl font-extrabold shrink-0"
-                    >
-                      {score} pts
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {playerAnswer && (
+                        <span className="rounded-xl px-2.5 py-1.5 text-base font-black bg-white text-slate-950 shadow-sm">
+                          {isTimeOver ? playerAnswer : '✓'}
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          backgroundColor: palette.badgeBg,
+                          color: palette.badgeText,
+                        }}
+                        className="rounded-xl px-4 py-1.5 text-xl sm:text-2xl font-extrabold shrink-0"
+                      >
+                        {score} pts
+                      </span>
+                    </div>
                   </li>
                 );
               })}
