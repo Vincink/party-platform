@@ -142,17 +142,32 @@ function isChoiceKey(value: string | null | undefined): value is ChoiceKey {
   return value === 'A' || value === 'B' || value === 'C' || value === 'D';
 }
 
-function getDeterministicPlayerPalette(
-  clientId: string,
-  pseudo: string,
-  fallbackId?: number
-): CardPalette {
-  const seed = `${clientId || fallbackId || ''}-${pseudo || ''}`;
+function getUniquePlayerPalette(player: PlayerRow, usedIndices: Set<number>): CardPalette {
+  const seed = `${player.client_id || player.id}-${player.pseudo || ''}`;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
-  const idx = hash % CARD_PALETTES.length;
+
+  let idx = hash % CARD_PALETTES.length;
+  let attempts = 0;
+  while (usedIndices.has(idx) && attempts < CARD_PALETTES.length) {
+    idx = (idx + 1) % CARD_PALETTES.length;
+    attempts++;
+  }
+
+  if (usedIndices.has(idx)) {
+    const hue = (hash * 137) % 360;
+    return {
+      bg: `hsl(${hue} 78% 46%)`,
+      border: `hsl(${hue} 90% 78%)`,
+      text: '#ffffff',
+      badgeBg: 'rgba(15, 23, 42, 0.35)',
+      badgeText: '#ffffff',
+    };
+  }
+
+  usedIndices.add(idx);
   return CARD_PALETTES[idx];
 }
 
@@ -188,7 +203,6 @@ export default function PlayerPage() {
     clientIdRef.current = clientId;
   }, [clientId]);
 
-  // Verrouillage strict du zoom et du scroll sur mobile
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -245,7 +259,6 @@ export default function PlayerPage() {
     };
   }, []);
 
-  // Résolution initiale du room_code, client_id et pseudo enregistré
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -304,7 +317,6 @@ export default function PlayerPage() {
 
     try {
       const activeClientId = clientId || generateClientId();
-      const palette = getDeterministicPlayerPalette(activeClientId, cleanPseudo);
 
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('party_client_id', activeClientId);
@@ -333,7 +345,6 @@ export default function PlayerPage() {
           .from('players')
           .update({
             pseudo: cleanPseudo,
-            avatar: palette.bg,
             is_connected: true,
           })
           .eq('id', latestRow.id)
@@ -350,7 +361,6 @@ export default function PlayerPage() {
             room_code: cleanCode,
             client_id: activeClientId,
             pseudo: cleanPseudo,
-            avatar: palette.bg,
             score: 0,
             is_connected: true,
             answer: null,
@@ -374,7 +384,6 @@ export default function PlayerPage() {
     }
   };
 
-  // Signaler la déconnexion quand le joueur quitte ou ferme l'onglet
   useEffect(() => {
     if (!isJoined || !roomCode || !clientId) return;
 
@@ -403,19 +412,6 @@ export default function PlayerPage() {
       window.removeEventListener('beforeunload', markDisconnected);
     };
   }, [isJoined, roomCode, clientId]);
-
-  const handleLeaveRoom = async () => {
-    if (player?.id) {
-      await supabase.from('players').update({ is_connected: false }).eq('id', player.id);
-    } else if (roomCode && clientId) {
-      await supabase
-        .from('players')
-        .update({ is_connected: false })
-        .eq('room_code', roomCode)
-        .eq('client_id', clientId);
-    }
-    setIsJoined(false);
-  };
 
   const syncData = useCallback(async () => {
     if (!roomCode || !clientId) return;
@@ -562,26 +558,40 @@ export default function PlayerPage() {
   };
 
   const playerName = player?.pseudo?.trim() || pseudoInput.trim() || 'Joueur';
-  const playerPalette = useMemo(() => {
-    const base = getDeterministicPlayerPalette(
-      player?.client_id || clientId,
-      playerName,
-      player?.id
-    );
-    if (player?.avatar && player.avatar.startsWith('#')) {
-      const matched = CARD_PALETTES.find(
-        (p) => p.bg.toLowerCase() === player.avatar!.toLowerCase()
-      );
-      if (matched) return matched;
-    }
-    return base;
-  }, [player?.client_id, player?.id, player?.avatar, clientId, playerName]);
-
   const score = typeof player?.score === 'number' ? player.score : 0;
-  const playerRank = useMemo(() => {
-    const idx = allPlayers.findIndex((p) => p.client_id?.trim() === clientId);
-    return idx >= 0 ? idx + 1 : 1;
-  }, [allPlayers, clientId]);
+
+  const { playerPalette, playerRank } = useMemo(() => {
+    const used = new Set<number>();
+    let foundPalette: CardPalette | null = null;
+    let foundRank = 1;
+
+    allPlayers.forEach((p, idx) => {
+      const pal = getUniquePlayerPalette(p, used);
+      if (p.client_id?.trim() === clientId || (player?.id && p.id === player.id)) {
+        foundPalette = pal;
+        foundRank = idx + 1;
+      }
+    });
+
+    if (!foundPalette) {
+      const fallbackRow: PlayerRow = player || {
+        id: 0,
+        pseudo: playerName,
+        avatar: null,
+        score,
+        is_connected: true,
+        answer: null,
+        room_code: roomCode || null,
+        client_id: clientId || null,
+      };
+      foundPalette = getUniquePlayerPalette(fallbackRow, used);
+    }
+
+    return {
+      playerPalette: foundPalette,
+      playerRank: foundRank,
+    };
+  }, [allPlayers, clientId, player, playerName, score, roomCode]);
 
   const activeChoice: ChoiceKey | null =
     selectedChoice ?? (isChoiceKey(player?.answer) ? player.answer : null);
@@ -604,7 +614,6 @@ export default function PlayerPage() {
         }
       `}</style>
 
-      {/* Halos lumineux identiques à l'écran TV */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_85%_60%_at_50%_0%,rgba(59,130,246,0.34),rgba(14,23,42,0))]"
@@ -678,7 +687,7 @@ export default function PlayerPage() {
         </div>
       ) : (
         <>
-          {/* Carte joueur aux couleurs exactes du classement TV (Rang + Nom + Points) */}
+          {/* Pastille joueur aux couleurs exactes du classement TV (Rang + Nom + Points) */}
           <header
             style={{
               backgroundColor: playerPalette.bg,
@@ -700,29 +709,15 @@ export default function PlayerPage() {
               <span className="font-bold text-lg truncate">{playerName}</span>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <span
-                style={{
-                  backgroundColor: playerPalette.badgeBg,
-                  color: playerPalette.badgeText,
-                }}
-                className="rounded-xl px-3 py-1 text-base font-extrabold shrink-0"
-              >
-                {score} pts
-              </span>
-              <button
-                type="button"
-                onClick={() => void handleLeaveRoom()}
-                style={{
-                  backgroundColor: playerPalette.badgeBg,
-                  color: playerPalette.badgeText,
-                }}
-                className="rounded-xl px-2.5 py-1.5 text-xs font-semibold active:opacity-80"
-                title="Changer de pseudo ou quitter"
-              >
-                Quitter
-              </button>
-            </div>
+            <span
+              style={{
+                backgroundColor: playerPalette.badgeBg,
+                color: playerPalette.badgeText,
+              }}
+              className="rounded-xl px-3.5 py-1 text-base font-extrabold shrink-0"
+            >
+              {score} pts
+            </span>
           </header>
 
           {/* Infos question + chrono */}
