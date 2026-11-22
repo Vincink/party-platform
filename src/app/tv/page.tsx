@@ -118,8 +118,24 @@ function parseConfig(raw: RoomRow['config'] | undefined): RoomConfig {
   return raw;
 }
 
+function paletteFromAvatar(avatar: string | null | undefined): CardPalette | null {
+  if (!avatar) return null;
+  const clean = avatar.trim().toLowerCase();
+  const matched = CARD_PALETTES.find((p) => p.bg.toLowerCase() === clean);
+  return matched || null;
+}
+
 function getUniquePlayerPalette(player: PlayerRow, usedIndices: Set<number>): CardPalette {
-  const seed = `${player.id}-${player.client_id || ''}-${player.pseudo || ''}`;
+  const fromDb = paletteFromAvatar(player.avatar);
+  if (fromDb) {
+    const dbIdx = CARD_PALETTES.findIndex((p) => p.bg === fromDb.bg);
+    if (dbIdx >= 0) {
+      usedIndices.add(dbIdx);
+    }
+    return fromDb;
+  }
+
+  const seed = `${player.client_id || player.id}-${player.pseudo || ''}`;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
